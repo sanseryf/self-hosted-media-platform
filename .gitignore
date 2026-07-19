@@ -1,0 +1,15 @@
+.env
+*.env
+!.env.example
+__pycache__/
+*.pyc
+
+# Runtime data written by the apps (history samples, generated salts).
+data/
+
+# Operator-local service config lives at the repo root; the checked-in
+# hub/backend/config/*.json files are part of the application (the door list
+# and the "under the hood" spec panel read them) and are deliberately NOT
+# ignored — an anchored /config/ rule instead of a bare `config/`, which
+# matched at every depth and silently swallowed them.
+/config/
