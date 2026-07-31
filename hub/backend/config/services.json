@@ -1,0 +1,41 @@
+{
+  "_comment": "Single source of truth for the public service doors. Read by hub/backend/stats.py (status pinger + landing-page nav) and devops-console/server.py (status board) - see DevOps-Console-Hub-Modernization-Handoff.md Stage 5 (S2). Health checks are built as http://<host>:<port><health_path>, where <host> is STATUS_HOST (hub) or SRV (devops-console). Order here drives door order on the landing page (the 'watch' entry is rendered as the small 'Open in the Jellyfin app' link, since in-Hub Watch is the primary tile). Doors are paired by media type: Watch + Request video, Read + Request books.",
+  "services": [
+    {
+      "key": "watch",
+      "name": "Watch",
+      "desc": "Films & series — Jellyfin",
+      "icon": "play",
+      "public_url": "https://watch.example.org",
+      "port": 8096,
+      "health_path": "/health"
+    },
+    {
+      "key": "request",
+      "name": "Request",
+      "desc": "Movies, series & anime — Jellyseerr",
+      "icon": "target",
+      "public_url": "https://request.example.org",
+      "port": 5055,
+      "health_path": "/api/v1/status"
+    },
+    {
+      "key": "read",
+      "name": "Read",
+      "desc": "Books & comics — Kavita",
+      "icon": "book",
+      "public_url": "https://read.example.org",
+      "port": 5000,
+      "health_path": "/"
+    },
+    {
+      "key": "browse",
+      "name": "Request",
+      "desc": "Book requests",
+      "icon": "target",
+      "public_url": "https://browse.example.org",
+      "port": 8088,
+      "health_path": "/api/health"
+    }
+  ]
+}

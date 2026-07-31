@@ -1,0 +1,1125 @@
+/* app.css — index.html's component layer.
+
+   Split out of a 268 KB single-file index.html. Design tokens and the page
+   base live in tokens.css (linked first, so every var() here resolves); this
+   file is everything built on top of them — the decorative stage, doors,
+   rails, catalog, modals, command palette, watch-together lobby and player.
+
+   Cached independently of the HTML: index.html is served no-cache (it changes
+   every deploy and must revalidate), while this is served with a long max-age,
+   so a deploy that only touches markup no longer re-downloads 90 KB of CSS.
+   Load order in index.html:  tokens.css -> app.css. */
+
+/* ── Nocturne decorative stage — replaces the old aurora/stars/fog/canopy/
+     grain layers wholesale (Stage 1 of the reskin). Same fixed, full-bleed
+     clip-box shape as the layer it replaces (the wrapper is itself
+     position:fixed + overflow:hidden, so nothing inside it can ever widen
+     the page the way the old 160vh aurora blob could on phones) — a dot-grid
+     field, a Tron-perspective floor, and a vignette (the bright neon
+     floorline was removed per user request). Purely decorative (aria-hidden, zero
+     interactive elements), so this is a like-for-like visual swap: nothing
+     downstream that reads page structure changed. */
+  .stage{position:fixed; inset:0; z-index:0; pointer-events:none; overflow:hidden;}
+  .stage .grid{position:absolute; inset:0; opacity:.4;
+    background-image:radial-gradient(rgba(120,180,235,.13) 1px, transparent 1.5px); background-size:30px 30px;
+    -webkit-mask-image:radial-gradient(120% 78% at 50% 8%, #000, transparent 70%);
+            mask-image:radial-gradient(120% 78% at 50% 8%, #000, transparent 70%);}
+  .stage .floor{position:absolute; left:-10%; right:-10%; bottom:0; height:42vh;
+    background:linear-gradient(to top, color-mix(in srgb,var(--cyan) 9%,transparent), transparent 62%),
+      repeating-linear-gradient(90deg, transparent 0 78px, rgba(120,180,235,.10) 78px 79px);
+    transform:perspective(60vh) rotateX(72deg); transform-origin:bottom;
+    -webkit-mask-image:linear-gradient(to top,#000,transparent 78%); mask-image:linear-gradient(to top,#000,transparent 78%);}
+  .stage .vig{position:absolute; inset:0; background:radial-gradient(100% 66% at 50% 40%, transparent 52%, color-mix(in srgb, var(--void) 60%, transparent) 100%);}
+
+  /* Media Hub canopy — a faint foliage silhouette hanging from the top edge so
+     the backdrop reads as "looking up through the forest" rather than a generic
+     tech grid. Theme-tinted (--violet), very low opacity, masked to melt into the
+     dark. Purely decorative, inside the aria-hidden .stage. Tune via opacity. */
+  .stage .canopy{position:absolute; top:0; left:0; width:100%; height:min(30vh,260px); display:block;
+    color:var(--violet); opacity:.11;
+    -webkit-mask-image:linear-gradient(to bottom,#000 18%,transparent 90%);
+            mask-image:linear-gradient(to bottom,#000 18%,transparent 90%);}
+  .stage .canopy path{fill:currentColor;}
+
+  /* ── media doors — the prominent, apparent entry to each media type (Watch =
+     in-hub library, Read = Kavita, Listen = AudioBookshelf). Sits at the top of
+     the homepage so browsing the library and reaching books/audiobooks are
+     first-class, not buried in a rail button/footer link. Reuses the token
+     system + the softened --gc glow on hover. */
+  .doors{display:grid; grid-template-columns:repeat(3,1fr); gap:var(--s4); margin:0 0 var(--section);}
+  @media(max-width:640px){ .doors{grid-template-columns:1fr;} }
+  .door{display:flex; align-items:center; gap:var(--s3); padding:var(--s3) var(--s4) var(--s3) var(--s5);
+    background:linear-gradient(180deg,var(--raised) 0%,var(--surface) 100%);
+    border:1px solid var(--line); border-radius:var(--r-lg); box-shadow:var(--shadow-sm);
+    transition:transform .25s var(--ease), border-color .25s var(--ease), box-shadow .25s var(--ease);}
+  .door:hover{border-color:color-mix(in srgb,var(--cyan) 32%,transparent);
+    box-shadow:var(--shadow-md), 0 0 30px -12px var(--gc); transform:translateY(-2px);}
+  /* the browse action fills the tile; the Request pill sits at the end (separate
+     anchors — a link can't nest inside a link). */
+  .door-main{display:flex; align-items:center; gap:var(--s4); flex:1 1 auto; min-width:0;
+    color:var(--ink); text-decoration:none;}
+  .door-main:focus-visible{outline:2px solid var(--cyan); outline-offset:4px; border-radius:var(--r-md);}
+  .door .di{width:42px; height:42px; flex:none; display:grid; place-items:center; border-radius:var(--r-md);
+    background:color-mix(in srgb,var(--accent) 13%,transparent); color:var(--accent-2);}
+  .door .di svg{width:22px; height:22px;}
+  .door .dt{font-family:var(--serif); font-size:var(--t-lead); font-weight:600; line-height:1.1; display:block;}
+  .door .ds{font-size:var(--t-meta); color:var(--muted); margin-top:3px; display:block;}
+  .door-req{flex:none; font-size:var(--t-cap); font-weight:600; color:var(--link); text-decoration:none;
+    padding:6px 12px; border:1px solid var(--line); border-radius:var(--r-pill); white-space:nowrap;
+    transition:color .2s var(--ease), border-color .2s var(--ease), box-shadow .2s var(--ease);}
+  .door-req:hover, .door-req:focus-visible{color:var(--link-2); outline:none;
+    border-color:color-mix(in srgb,var(--cyan) 42%,transparent); box-shadow:0 0 16px -7px var(--gc);}
+
+  /* ── unified components (UI pass A) ──────────────────────────────────────
+     Defined once here; every feature-specific class below (.cap, .kicker,
+     .who, .lgen, .ck, .syn-more, .sstate, .authbtn, .lbtn, .pv-btn,
+     .libcontrols input/select, login inputs, .lb/.lbox/.loginbox/.pv-box)
+     is wired to reuse these rather than reinventing padding/radius/shadow —
+     see each section's comment below for how. Semantic color overrides
+     (e.g. genre labels staying --accent-2) are kept as small deltas after
+     the shared rule, per the plan. */
+
+  /* eyebrow — the one uppercase-micro-label treatment. Muted by default;
+     .eyebrow--accent is the semantic-color variant used where the label
+     itself carries meaning (genre tags, spec keys, etc). */
+  .eyebrow, .cap, .kicker, .npc .who, .syn-g, .lgen, .crow .ck, .storage .ck,
+  .roadmap .ck, .sname .sstate, .syn-more{
+    font-size:var(--t-eyebrow); letter-spacing:.28em; text-transform:uppercase;
+    color:var(--muted); font-weight:700; margin:0;
+  }
+  /* Nocturne eyebrow variant — the mockup's own neon-gradient-clipped label
+     treatment (its .eyebrow.neon), for the one or two spots per view where
+     an eyebrow IS the brand moment (the gate's "Media Hub" label) rather
+     than a quiet section header. Additive: everything above still applies
+     (size/tracking/weight), this only swaps the color to the gradient. */
+  .eyebrow.neon{background:var(--neon); -webkit-background-clip:text; background-clip:text; color:transparent;}
+  .eyebrow--accent, .syn-g, .lgen, .crow .ck, .storage .ck, .roadmap .ck, .syn-more{ color:var(--accent-2); }
+
+  /* btn — one button system. Base is the ghost/outline look every text
+     button already converged on; variants layer on top. Existing classes
+     (.authbtn/.lbtn/.pv-btn) are wired into this base via comma-selectors
+     below rather than renamed in markup, so no onclick/behavior wiring
+     anywhere changes — purely a shared-rule consolidation. */
+  /* Nocturne button treatment — three tiers, matching the mockup's plain/
+     wire/neon system, mapped onto the EXISTING class set (zero HTML/JS
+     changes): plain outline is still the shared base every button starts
+     from; .btn--accent/.authbtn.authbtn-in become the "wire" tier (a
+     colored outline for an important-but-not-the-one-CTA action — the
+     mockup's own "Watch together" header button is wire, not neon, which is
+     exactly the role .authbtn plays here too); the neon gradient-fill tier
+     is reserved for genuinely one-per-screen hero CTAs (.hero-play, and
+     `button.lbtn` specifically — the element-type selector already used for
+     :hover below distinguishes the two real <button type=submit> gate/login
+     actions from the several <a class="lbtn"> external-link badges (IMDb/
+     TMDB/Letterboxd) that share the class for its outline look but aren't a
+     "press this now" CTA and would look wrong wrapped in a glowing pill). */
+  .btn, .authbtn, .lbtn, button.lbtn{
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+    background:transparent; border:1px solid var(--line); color:var(--ink-dim);
+    border-radius:var(--r-md); padding:8px 16px; font-size:var(--t-meta); font-weight:600;
+    font-family:inherit; text-decoration:none; cursor:pointer; white-space:nowrap;
+    transition:color .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease), transform .18s var(--ease), box-shadow .18s var(--ease);
+  }
+  .btn:focus-visible, .authbtn:focus-visible, .lbtn:focus-visible{
+    outline:2px solid var(--cyan); outline-offset:2px;
+  }
+  .btn--sm, .authbtn{ padding:5px 12px; font-size:var(--t-eyebrow); border-radius:var(--r-sm); }
+  /* plain tier hover — platinum, not the click-target cyan (that's wire's
+     job): a lift + brighter neutral border, matching the mockup's own
+     `.btn:hover` exactly. */
+  .btn--ghost:hover, .btn:hover, .authbtn:hover, a.lbtn:hover{
+    color:var(--platinum-bright); border-color:var(--platinum); transform:translateY(-1px);
+  }
+  /* wire tier — colored outline, brightens + glows cyan on hover. */
+  .btn--accent, .authbtn.authbtn-in{ color:var(--cyan); border-color:color-mix(in srgb, var(--cyan) 40%, transparent); }
+  .btn--accent:hover, .authbtn.authbtn-in:hover{ color:#fff; border-color:var(--cyan); box-shadow:0 0 18px -6px var(--gc); transform:translateY(-1px); }
+  /* neon tier — solid gradient fill, dark text for contrast, soft dual glow.
+     `button.lbtn` only (see the tier comment above) — a.lbtn stays plain. */
+  button.lbtn{ border:none; color:var(--void); background:var(--neon); font-weight:700;
+    box-shadow:0 0 20px -4px var(--gm), 0 0 34px -8px var(--gc); }
+  button.lbtn:hover{ filter:brightness(1.08); transform:translateY(-1px); color:var(--void); border:none; background:var(--neon); }
+  .pv-btn.btn{ border:none; padding:4px; border-radius:0; color:#fff; opacity:.9; }
+
+  /* field — one input/select treatment for .libcontrols and the login form.
+     Fixes the old sizing quirk permanently: .field never sets a flex-basis
+     itself, so a column form (.loginform) can't inherit a giant row-flex
+     height by accident — flex behavior is opt-in per-container instead. */
+  .field{
+    background:var(--bg-soft); border:1px solid var(--line); color:var(--ink);
+    border-radius:var(--r-md); padding:10px 14px; font-size:var(--t-meta); font-family:inherit;
+    -webkit-appearance:none; appearance:none;
+  }
+  .field:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .field::placeholder{ color:var(--muted); }
+
+  /* searchfield — the ONE search-input shell (design-review #1). A leading
+     magnifier icon + a borderless input inside a shared rounded shell, so
+     every "search" on the site reads as the same component: it mirrors the
+     ⌘K palette's .p-input (icon + borderless field) and the header .search
+     pill (same border, same cyan focus signal). The library filter search
+     was the outlier — a flat bordered rectangle with no icon — and now
+     inherits this. Same box metrics as .field (10px/14px padding) so it lines
+     up with the genre/sort selects sitting beside it in .libcontrols. */
+  .searchfield{ display:flex; align-items:center; gap:10px; padding:10px 14px;
+    background:var(--bg-soft); border:1px solid var(--line); border-radius:var(--r-md);
+    color:var(--muted); cursor:text; transition:border-color .2s var(--ease), background .2s var(--ease); }
+  .searchfield:focus-within{ border-color:var(--cyan); background:color-mix(in srgb, var(--cyan) 5%, transparent); }
+  .searchfield svg{ width:16px; height:16px; flex:none; opacity:.8; }
+  .searchfield input{ flex:1; min-width:0; background:none; border:none; outline:none;
+    color:var(--ink); font:400 var(--t-meta)/1.2 inherit; padding:0; -webkit-appearance:none; appearance:none; }
+  .searchfield input::placeholder{ color:var(--muted); }
+  /* the search-input clear "x" (WebKit) inherits the muted chrome */
+  .searchfield input::-webkit-search-cancel-button{ filter:grayscale(1) opacity(.5); }
+
+  /* overlay / sheet — the shared .lb backdrop recipe + card treatment, used
+     by the detail modal, login modal, and player box (all --r-xl, same
+     shadow token, same close-button component). */
+  .overlay{position:fixed; inset:0; z-index:80; background:color-mix(in srgb, var(--bg) 80%, transparent); backdrop-filter:blur(6px);
+    display:none; align-items:center; justify-content:center; padding:28px;}
+  .overlay.on{display:flex;}
+  .sheet{position:relative; background:linear-gradient(160deg,var(--modal-grad-1),var(--modal-grad-2));
+    border:1px solid var(--line); border-radius:var(--r-xl); box-shadow:var(--shadow-lg);}
+  .sheet-close{position:absolute; top:12px; right:14px; z-index:3; width:30px; height:30px; border-radius:var(--r-sm);
+    background:color-mix(in srgb, var(--bg) 70%, transparent); border:1px solid var(--line); color:var(--ink-dim); cursor:pointer; font-size:13px; line-height:1;
+    display:flex; align-items:center; justify-content:center;}
+  .sheet-close:hover{color:var(--ink); border-color:var(--accent);}
+
+  /* ── UI pass B: split prose-width vs. wide-track containers ──────────────
+     .wrap (hero/prose) stays a readable measure; .wrap--wide is the same
+     centered container with a wider cap so the catalog grid and discovery
+     rails gain columns for free on ultrawide (the grid already uses
+     auto-fill,minmax — a wider container is the whole fix). Both flow from
+     the same two width tokens, so tightening/loosening either later is a
+     one-line token change, not a hunt through selectors. */
+  .wrap{position:relative; z-index:2; max-width:var(--w-read); margin:0 auto; padding:0 var(--s5);}
+  .wrap--wide{max-width:var(--w-wide);}
+  /* The header wrap must out-stack the hero: every .wrap shares z-index:2, and
+     the hero comes later in the DOM, so a header popover (appearance/account)
+     dropping down into the hero's band would otherwise be painted over by the
+     hero slices. Lifting just the header's wrap fixes it without touching the
+     rest of the page's stacking. */
+  #topwrap{z-index:30;}
+  /* Phones: the 24px fixed gutters eat a big share of a ~360px screen and
+     make every rail/grid feel cramped. Drop to 16px to reclaim usable width
+     (also pulls the hero copy, which shares .wrap, tighter to the edge). */
+  @media(max-width:640px){ .wrap{padding:0 var(--s4);} }
+  /* ── streaming-app redesign: compact top-bar ──────────────────────────────
+     The page used to open with a 60vh centered hero built entirely from text
+     (h1 + lede). That's now the rotating backdrop hero banner below instead —
+     this bar is just the persistent brand mark + controls, present in both
+     home and catalog view (unlike the hero banner, which hides in catalog). */
+  header{padding:18px 0 14px;}
+  .topline{display:flex; align-items:center; justify-content:space-between; gap:16px; margin:0; flex-wrap:wrap;}
+  .kicker{letter-spacing:.32em; min-width:0;}
+  /* theme picker — a few quiet swatch buttons, restrained enough to sit right
+     next to the kicker line without competing with it */
+  .theming{display:flex; align-items:center; gap:8px; flex:none;}
+  .theming button{width:14px; height:14px; padding:0; border-radius:50%; cursor:pointer;
+    border:1px solid color-mix(in srgb, var(--line-c) 55%, transparent); position:relative;
+    transition:transform .25s var(--ease), border-color .25s var(--ease);}
+  .theming button:hover{transform:scale(1.18);}
+  .theming button[aria-pressed="true"]::after{content:""; position:absolute; inset:-4px;
+    border-radius:50%; border:1px solid var(--ink-dim);}
+  .theming button:focus-visible{outline:2px solid var(--accent); outline-offset:3px;}
+  @media(prefers-reduced-motion:reduce){.theming button{transition:none}}
+  /* ⌘K trigger pill — mockup's own .search, unmodified. Hidden below 640px
+     (mockup's own breakpoint too) since the header's already tight there;
+     ⌘K/Ctrl+K itself still works from a keyboard on mobile-width desktop
+     windows, this is just the visible affordance. */
+  .search{flex:1; max-width:460px; display:flex; align-items:center; gap:10px; cursor:text; height:38px; padding:0 13px;
+    border-radius:var(--r-md); background:color-mix(in srgb, var(--line-c) 5%, transparent); border:1px solid var(--line);
+    color:var(--muted); font-size:13px; font-family:inherit; transition:.2s var(--ease);}
+  .search:hover{border-color:var(--cyan); background:color-mix(in srgb, var(--cyan) 6%, transparent); color:var(--ink-dim);}
+  .search svg{width:15px; height:15px; opacity:.7; flex:none;}
+  .search span:not(.kbd){overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:left;}
+  .search .kbd{margin-left:auto; display:flex; gap:3px; flex:none;}
+  .kbd b{font:700 11px/1 inherit; color:var(--ink-dim); background:color-mix(in srgb, var(--line-c) 9%, transparent);
+    border:1px solid var(--line); border-radius:5px; padding:3px 5px;}
+  @media(max-width:640px){.search{display:none;}}
+  /* ── identity cluster (design-review #5) ───────────────────────────────────
+     One coherent right-side cluster, three clearly-distinct affordances in one
+     visual language instead of three: (1) "Watch together" — the single
+     standalone action, a wire button; (2) an appearance icon-button that opens
+     a labelled Theme popover (the 6 colour swatches used to sit bare in the
+     header and read like an avatar row — now they're behind a labelled control,
+     no longer ambiguous); (3) an account avatar that opens a menu holding the
+     username, The instrument, and Sign out (previously bare "name · Sign out"
+     text). .hmenu is the shared positioned wrapper for a button + its popover. */
+  .topright{display:flex; align-items:center; gap:10px;}
+  .authbox{display:flex; align-items:center; gap:10px;}
+  .authbtn{white-space:nowrap;}
+  .hmenu{position:relative; display:inline-flex;}
+  /* quiet square icon-button — same outline language as the .btn base */
+  .iconbtn{width:32px; height:32px; padding:0; display:inline-flex; align-items:center; justify-content:center;
+    background:transparent; border:1px solid var(--line); border-radius:var(--r-sm); color:var(--ink-dim);
+    cursor:pointer; transition:color .18s var(--ease), border-color .18s var(--ease), box-shadow .18s var(--ease);}
+  .iconbtn:hover{color:var(--platinum-bright); border-color:var(--platinum);}
+  .iconbtn:focus-visible{outline:2px solid var(--cyan); outline-offset:2px;}
+  .iconbtn svg{width:17px; height:17px;}
+  .iconbtn[aria-expanded="true"]{color:var(--cyan); border-color:color-mix(in srgb, var(--cyan) 45%, transparent);}
+  /* account avatar — same 32px footprint as the icon-button, but round + the
+     click-target cyan, so it reads as "you" */
+  .avatar{width:32px; height:32px; padding:0; border-radius:50%; display:inline-flex; align-items:center; justify-content:center;
+    background:color-mix(in srgb, var(--cyan) 12%, transparent); border:1px solid color-mix(in srgb, var(--cyan) 40%, transparent);
+    color:var(--cyan); font:700 13px/1 var(--sans); cursor:pointer; flex:none;
+    transition:box-shadow .18s var(--ease), border-color .18s var(--ease);}
+  .avatar:hover, .avatar[aria-expanded="true"]{border-color:var(--cyan); box-shadow:0 0 16px -5px var(--gc);}
+  .avatar:focus-visible{outline:2px solid var(--cyan); outline-offset:2px;}
+  /* dropdown popover — reuses the modal-surface gradient/border/shadow tokens */
+  .menu{position:absolute; top:calc(100% + 8px); right:0; z-index:120; min-width:210px; padding:6px;
+    background:linear-gradient(160deg,var(--modal-grad-1),var(--modal-grad-2)); border:1px solid var(--line-strong);
+    border-radius:var(--r-md); box-shadow:var(--shadow-md); animation:menu-pop .16s var(--ease);}
+  .menu[hidden]{display:none;}
+  @keyframes menu-pop{from{opacity:0; transform:translateY(-4px);}}
+  @media(prefers-reduced-motion:reduce){.menu{animation:none;}}
+  .menu-label{font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); font-weight:700; padding:6px 8px 8px;}
+  .menu-head{padding:6px 10px 10px; margin:0 0 6px; border-bottom:1px solid var(--line);}
+  .menu-name{display:block; font-weight:700; color:var(--ink); font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+  .menu-sub{display:block; font-size:11px; color:var(--muted); margin-top:2px;}
+  .menu-item{display:flex; align-items:center; gap:10px; width:100%; text-align:left; background:none; border:none;
+    color:var(--ink-dim); font:600 13px/1.2 var(--sans); padding:9px 10px; border-radius:var(--r-sm); cursor:pointer;}
+  .menu-item:hover{background:color-mix(in srgb, var(--line-c) 8%, transparent); color:var(--ink);}
+  .menu-item svg{width:15px; height:15px; flex:none; opacity:.85;}
+  /* the theme swatches now live inside the labelled appearance popover, a touch
+     larger than the old bare-header dots for a comfortable tap target */
+  .appearance-menu{min-width:0;}
+  .appearance-menu .theming{padding:4px 6px 6px; gap:10px;}
+  .appearance-menu .theming button{width:20px; height:20px;}
+  /* Privacy section inside the appearance popover — the hot-join opt-in.
+     Widens the otherwise min-width:0 appearance menu enough for the copy. */
+  .pref-section{margin-top:6px; padding-top:4px; border-top:1px solid var(--line); width:min(84vw,300px);}
+  .pref-row{display:flex; align-items:flex-start; gap:12px; padding:6px 8px 8px; cursor:pointer;}
+  .pref-copy{display:flex; flex-direction:column; gap:3px; min-width:0;}
+  .pref-title{font:600 13px/1.2 var(--sans); color:var(--ink);}
+  .pref-note{font-size:11px; line-height:1.4; color:var(--muted);}
+  /* Toggle switch — the checkbox is the real control (kept accessible, just
+     visually collapsed to a dot); .pref-switch-track is the rendered pill. */
+  .pref-switch{position:relative; flex:none; width:38px; height:22px; margin-top:1px;}
+  .pref-switch input{position:absolute; inset:0; margin:0; opacity:0; width:100%; height:100%; cursor:pointer;}
+  .pref-switch-track{position:absolute; inset:0; border-radius:999px; background:var(--line-strong);
+    transition:background .18s var(--ease);}
+  .pref-switch-track::after{content:""; position:absolute; top:2px; left:2px; width:18px; height:18px;
+    border-radius:50%; background:var(--ink); box-shadow:var(--shadow-sm); transition:transform .18s var(--ease);}
+  .pref-switch input:checked ~ .pref-switch-track{background:var(--accent);}
+  .pref-switch input:checked ~ .pref-switch-track::after{transform:translateX(16px);}
+  .pref-switch input:focus-visible ~ .pref-switch-track{outline:2px solid var(--accent); outline-offset:2px;}
+  .pref-switch input:disabled{cursor:default;}
+  .pref-switch input:disabled ~ .pref-switch-track{opacity:.5;}
+  @media(prefers-reduced-motion:reduce){.pref-switch-track,.pref-switch-track::after{transition:none;}}
+  /* wordmark — the ONE Media|Forest mark (design-review #6). A single locked
+     treatment reused on the header, the sign-in gate, and the hero empty-state
+     so the logo never drifts between solid / uppercase / gradient variants
+     across screens: "Media" and "Forest" in --ink, the "|" divider in the
+     brand neon gradient text-clip. Its glow comes from the theme-universal
+     .bar rule up top (additive with background-clip:text). .wordmark--lg is
+     the larger cut for the gate/hero, where the mark stands alone. */
+  h1, .wordmark{font-family:var(--serif); font-weight:600; line-height:1;
+    letter-spacing:-.005em; margin:0; color:var(--ink);}
+  h1{font-size:clamp(21px, 2.4vw, 27px);}
+  .wordmark{display:inline-block; font-size:clamp(21px, 2.4vw, 27px);}
+  .wordmark--lg{font-size:clamp(30px, 4vw, 40px);}
+  h1 .bar, .wordmark .bar{background:var(--neon); -webkit-background-clip:text; background-clip:text; color:transparent;
+    font-weight:400; margin:0 .1em; opacity:.92;}
+  .h1home{cursor:pointer; display:inline-block;}
+  .h1home:hover .bar{opacity:1;}
+  .h1home:focus-visible{outline:2px solid var(--accent); outline-offset:6px; border-radius:6px;}
+  /* small secondary link for the demoted Jellyfin native-app entry, and the
+     Books disclosure's two links (reused there — same "quiet inline link"
+     treatment throughout the page) */
+  .applink{font-size:13px; color:var(--muted); margin:0; letter-spacing:.01em;}
+  .applink a{color:var(--ink-dim); text-decoration:none; font-weight:600; border-bottom:1px solid var(--line);}
+  .applink a:hover{color:var(--link); border-color:var(--link);}
+
+  /* ── Nocturne Stage 2 fidelity pass: scrollable hero strip ────────────────
+     Was a fixed 3-slice grid triptych (a divergence the first Stage-2 port
+     introduced); the approved mockup is a horizontally-scrollable band of
+     banner slices instead, so this now uses the exact same overflow-x
+     scroll + scroll-snap + edge-fade-mask recipe as .addgrid (the poster
+     rails) rather than a grid — 2-3 slices visible at a time, scroll for
+     the rest. loadHero()/renderHero() below fetch and render more than 3
+     items again (see their own comments); heroPlay()/heroInfo()/
+     renderFilmDetail() are unchanged, only what calls them changed shape.
+     Scrim uses hub's own color-mix(var(--void)) convention (matching every
+     other themed scrim on the page) rather than the mockup's hardcoded
+     rgba(3,4,10,..), so it follows the active theme's actual base tone, not
+     just Nocturne's own. */
+  .hero{position:relative; z-index:2; width:100%; margin:0 0 var(--section);
+    display:flex; gap:14px; overflow-x:auto; overflow-y:visible; padding:4px 2px 14px;
+    scroll-snap-type:x proximity; scrollbar-width:thin; scrollbar-color:color-mix(in srgb, var(--accent) 45%, transparent) transparent;
+    height:clamp(300px, 44vw, 520px);
+    -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
+    mask-image:linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);}
+  .hero::-webkit-scrollbar{height:8px}
+  .hero::-webkit-scrollbar-thumb{background:color-mix(in srgb, var(--accent) 40%, transparent); border-radius:var(--r-sm)}
+  .hero::-webkit-scrollbar-track{background:transparent}
+  /* This page's own .hero{display:flex} outranks the UA [hidden]{display:none}
+     default (equal 0,1,0 specificity, page stylesheet wins the tie) - same
+     gotcha .pv-loading/.hero-nav already had to work around before Stage 2;
+     .hero didn't need this rule before since it had no `display` override of
+     its own. openCatalog()/closeCatalog() (further down) set hero.hidden to
+     toggle it, so without this it silently never actually hid. */
+  .hero[hidden]{display:none;}
+  /* #hero-slides is still renderHero()'s existing innerHTML target (zero JS
+     changes to the element-targeting) - display:contents makes the wrapper
+     invisible to flex layout, so its .slice children become direct flex
+     items of .hero, same as if there were no wrapper element at all. */
+  #hero-slides{display:contents;}
+  .slice{position:relative; overflow:hidden; border-radius:var(--r-lg); border:1px solid var(--line-strong);
+    display:flex; align-items:flex-end; isolation:isolate; cursor:pointer; background:var(--panel-bg);
+    flex:0 0 clamp(230px,27vw,380px); scroll-snap-align:start;
+    transition:border-color .3s var(--ease), transform .3s var(--ease);}
+  .slice:hover, .slice:focus-visible{border-color:color-mix(in srgb, var(--cyan) 55%, transparent); transform:translateY(-3px);}
+  .slice .bg{position:absolute; inset:0; z-index:0; background-size:cover; background-position:center 22%;
+    background-color:var(--panel-bg); transform:scale(1.04); transform-origin:center; transition:transform .5s var(--ease);}
+  .slice:hover .bg, .slice:focus-visible .bg{transform:scale(1.08);}
+  .slice::after{content:""; position:absolute; inset:0; z-index:1;
+    background:linear-gradient(0deg, color-mix(in srgb, var(--void) 96%, transparent) 4%, color-mix(in srgb, var(--void) 40%, transparent) 40%, transparent 74%);}
+  .slice .in{position:relative; z-index:2; padding:clamp(16px,2vw,26px); width:100%;}
+  .slice .hero-eyebrow{margin:0 0 6px;}
+  .slice.lead{flex:0 0 clamp(320px,37vw,560px);}
+  .slice h2{font-family:var(--serif); font-weight:600; color:#fff; margin:0;
+    line-height:1.02; letter-spacing:-.01em; text-shadow:0 4px 24px rgba(0,0,0,.5);}
+  .slice.lead h2{font-size:clamp(30px,3.2vw,50px);}
+  .slice:not(.lead) h2{font-size:clamp(20px,1.8vw,28px);}
+  .slice .meta{font-size:12px; color:var(--ink-dim); margin-top:9px; display:flex; gap:10px; flex-wrap:wrap; font-variant-numeric:tabular-nums;}
+  .slice .meta .r{color:var(--cyan); font-weight:700;}
+  .slice-syn{font-size:13px; color:var(--ink-dim); line-height:1.5; margin:10px 0 0; max-width:44ch;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+  /* the "go" action only reveals on hover/focus (mockup's own pattern) — one
+     hero CTA per slice, tucked away until you're actually looking at it. */
+  .slice .go{margin-top:14px; display:inline-flex; opacity:0; transform:translateY(6px); transition:.25s var(--ease);}
+  .slice:hover .go, .slice:focus-visible .go{opacity:1; transform:none;}
+  @media(prefers-reduced-motion:reduce){.slice .go{transition:none;} .slice .bg{transition:none;}}
+  /* Nocturne's one true hero CTA — neon gradient fill (mockup's .btn.neon),
+     same tier as button.lbtn's gate/login submit. The lead slice's Play only. */
+  .hero-play{background:var(--neon); color:var(--void); border:none; font-weight:700;
+    box-shadow:0 0 20px -4px var(--gm), 0 0 34px -8px var(--gc);}
+  .hero-play:hover{filter:brightness(1.08); background:var(--neon); border:none; color:var(--void);}
+  .hero-play svg{width:15px; height:15px;}
+  /* graceful empty state — no items yet (JF unreachable, empty local dev DB,
+     still loading). Keeps the compact-topbar brand line legible on its own
+     rather than leaving a jarring blank band. Unchanged from before Stage 2 -
+     still its own layout, not a .slice (there's nothing to click through to). */
+  .hero-empty{position:relative; z-index:2; flex:1 1 100%; height:100%; display:flex; flex-direction:column;
+    align-items:flex-start; justify-content:center; padding:0 0 var(--s6);}
+  .hero-title{font-family:var(--serif); font-weight:600; color:var(--ink);
+    font-size:clamp(28px,4.4vw,44px); line-height:1.04; letter-spacing:-.01em; margin:0;}
+  .hero-empty .wordmark{margin:0 0 4px;}
+  /* the lede paragraph only — scoped so it never restyles the .wordmark above it */
+  .hero-empty .hero-lede{font-size:var(--t-lead); color:var(--ink-dim); max-width:38ch; margin:14px 0 0; line-height:1.5;}
+  @media(max-width:900px){
+    .hero{height:clamp(240px, 58vw, 320px);}
+    .slice{flex-basis:74vw;} .slice.lead{flex-basis:86vw;}
+  }
+  @media(max-width:560px){
+    .hero{height:220px;}
+    .slice, .slice.lead{height:220px; flex-basis:88vw;}
+    .slice-syn{display:none;}
+  }
+
+  /* section heading row shared by the content rails — a .cap plus an
+     optional right-aligned quiet action (see-all / request link) */
+  .railhead{display:flex; align-items:baseline; justify-content:space-between; gap:14px; flex-wrap:wrap;
+    margin:0 0 var(--s4);}
+  .railhead .cap{margin:0;}
+
+  /* Continue Watching — same .pcard/.poster rail language as the discovery
+     rails, plus a progress bar baked into the poster. Signed-in-only. */
+  .cw{margin:0; display:none;} .cw.on{display:block;}
+  .cw .poster{cursor:pointer;}
+  .cw-bar{position:absolute; left:0; right:0; bottom:0; height:4px; background:rgba(0,0,0,.55); z-index:2;}
+  .cw-bar i{display:block; height:100%; background:var(--grad-progress);}
+  .cw-badge{position:absolute; top:8px; left:8px; z-index:2; font-size:9.5px; font-weight:700; letter-spacing:.06em;
+    text-transform:uppercase; padding:3px 7px; border-radius:var(--r-pill); backdrop-filter:blur(4px);
+    -webkit-backdrop-filter:blur(4px); background:color-mix(in srgb, var(--bg) 72%, transparent); border:1px solid var(--line); color:var(--ink-dim);}
+  .cw-sub{font-size:11px; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
+  /* Nocturne Stage 2: Books moved out of its own homepage disclosure into
+     two quiet dashed "cutout" links in the footer — see the HTML comment by
+     #footer-books for why two, not the mockup's one. Mockup's own .cutout
+     recipe, unmodified. */
+  .footer-books{display:inline-flex; gap:14px; flex-wrap:wrap;}
+  .cutout{display:inline-flex; align-items:center; gap:8px; padding:7px 14px; border-radius:var(--r-sm);
+    border:1px dashed color-mix(in srgb, var(--cyan) 28%, transparent);
+    color:var(--muted); font-size:12px; font-weight:600; transition:.2s var(--ease);}
+  .cutout:hover{color:var(--cyan); border-color:var(--cyan);}
+
+  /* "You've been signed out" toast — reuses the .sheet gradient/border/shadow
+     recipe (same as the modals) rather than inventing a new surface, just at
+     toast scale/position. Bottom-center works at every width without its
+     own breakpoint. */
+  .toast{position:fixed; z-index:100; left:50%; bottom:24px; transform:translate(-50%,10px);
+    display:flex; align-items:center; gap:16px; padding:13px 16px 13px 18px;
+    max-width:min(92vw, 420px); border-radius:var(--r-md);
+    background:linear-gradient(160deg,var(--modal-grad-1),var(--modal-grad-2));
+    border:1px solid var(--line); box-shadow:var(--shadow-md);
+    color:var(--ink-dim); font-size:13.5px; font-weight:500;
+    opacity:0; pointer-events:none; transition:opacity .25s var(--ease), transform .25s var(--ease);}
+  .toast.on{opacity:1; transform:translate(-50%,0); pointer-events:auto;}
+  .toast-actions{display:flex; gap:8px; flex:none;}
+  @media(prefers-reduced-motion:reduce){.toast{transition:none;}}
+  @media(max-width:480px){.toast{left:12px; right:12px; bottom:14px; transform:translateY(10px); max-width:none;}
+    .toast.on{transform:translateY(0);}}
+
+  /* ── Now playing (design-review #3: right-sized) ───────────────────────────
+     The old glass-in-ring centerpiece (a ~700px neon ring around one compact
+     card) was pure decoration — it didn't map to real data (the card already
+     carries its own progress bar) and ate a full screen of height. Removed.
+     Now playing is a plain card grid under a normal railhead, exactly like
+     Continue Watching, so it scales cleanly with no special-casing: 0 sessions
+     hides the whole section, 1 renders a single card, 2+ fill the grid. Every
+     session is the same .npc card (no primary/secondary split), so a
+     family server's concurrent viewers all read identically. */
+  .now{margin:var(--section) 0 0; display:none;}
+  .now.on{display:block;}
+  .cap{margin:0 0 var(--s4);}
+  .nowgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px;}
+  .npc{position:relative; border-radius:var(--r-xl); border:1px solid var(--line-strong);
+    background:linear-gradient(150deg, color-mix(in srgb, var(--raised-2) 74%, transparent), color-mix(in srgb, var(--surface) 68%, transparent));
+    backdrop-filter:blur(18px) saturate(1.3); -webkit-backdrop-filter:blur(18px) saturate(1.3);
+    box-shadow:0 30px 80px -30px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.06);
+    padding:var(--s4); transition:opacity .4s var(--ease);
+    display:flex; gap:16px; align-items:stretch;}
+  .np-poster{flex:0 0 72px; width:72px; border-radius:var(--r-md); overflow:hidden; background:var(--raised-2); border:1px solid var(--line-strong); align-self:flex-start;}
+  .np-poster img{width:100%; aspect-ratio:2/3; object-fit:cover; display:block;}
+  .np-body{flex:1; min-width:0; display:flex; flex-direction:column;}
+  .npc.paused{opacity:.6;}
+  .npc .row{display:flex; align-items:center; gap:8px;}
+  .npc .who{color:var(--accent-2); font-weight:700;}
+  /* type badge — Film / TV / Anime */
+  .npc .badge{font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; font-weight:700;
+    padding:2px 7px; border-radius:var(--r-pill); border:1px solid var(--line); color:var(--muted); margin-left:auto;}
+  .npc .badge.movie{color:var(--accent-2); border-color:color-mix(in srgb, var(--accent-2) 50%, transparent);}
+  .npc .badge.tv{color:var(--badge-tv); border-color:color-mix(in srgb, var(--badge-tv) 50%, transparent);}
+  .npc .badge.anime{color:var(--badge-anime); border-color:color-mix(in srgb, var(--badge-anime) 50%, transparent);}
+  .npc .tag{font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--muted);}
+  .npc .ttl{font-size:16.5px; font-weight:700; margin:6px 0 2px; letter-spacing:-.01em;}
+  .npc .se{color:var(--accent-2); font-variant-numeric:tabular-nums; font-weight:700;}
+  .npc .meta{font-size:12.5px; color:var(--muted);}
+  .npc .bar{height:4px; border-radius:4px; background:color-mix(in srgb, var(--void) 60%, transparent); margin-top:12px; overflow:hidden;}
+  .npc .bar i{display:block; height:100%; background:var(--grad-progress); box-shadow:0 0 12px var(--gm); transition:width .6s var(--ease);}
+  /* bottom row — elapsed/remaining time on the left, hot-join on the right
+     (mockup's .np-row/.np-join), replacing the old plain .time-then-button
+     stack so the join CTA reads as the card's one deliberate action. */
+  .np-row{display:flex; align-items:center; gap:12px; margin-top:10px;}
+  .np-watchwith{margin-left:auto;}
+  /* live pulse next to the "Now playing" cap */
+  .now .cap .live{display:inline-block; width:7px; height:7px; border-radius:50%; background:var(--ok);
+    margin-left:9px; vertical-align:middle; box-shadow:0 0 0 0 color-mix(in srgb, var(--ok) 60%, transparent); animation:pulse 2.2s infinite;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb, var(--ok) 55%, transparent);}70%{box-shadow:0 0 0 7px color-mix(in srgb, var(--ok) 0%, transparent);}100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--ok) 0%, transparent);}}
+  @media (prefers-reduced-motion: reduce){.now .cap .live{animation:none;}}
+
+  .ledger{display:flex; align-items:flex-end; justify-content:space-between; gap:var(--s6); flex-wrap:wrap;
+    margin:var(--section) 0 0; padding:var(--s5) 0 0; border-top:1px solid var(--line);}
+  .ledger .big{font-family:var(--serif); font-weight:600; font-size:clamp(46px,7.4vw,72px);
+    line-height:1; letter-spacing:-.02em; font-variant-numeric:tabular-nums;}
+  .ledger .big .u{font-family:var(--sans); font-size:15px; font-weight:500; color:var(--muted); margin-left:12px;}
+  .spark{display:block; margin-top:14px;}
+  .stats{display:flex; gap:34px; flex-wrap:wrap;}
+  .stat .n{font-size:22px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.01em;}
+  .stat .n.zero{color:var(--ink-dim); font-weight:400;}
+  .stat .l{font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.12em; margin-top:3px;}
+
+  /* watch time by genre — quiet bronze bars, shown only with data */
+  .genre{margin:var(--section) 0 0; display:none;}
+  .genre.on{display:block;}
+  .grow{display:grid; grid-template-columns:110px 1fr 52px; align-items:center; gap:14px; padding:7px 0;}
+  .grow .gl{font-size:13.5px; color:var(--ink-dim);}
+  .grow .gt{height:6px; border-radius:6px; background:rgba(255,255,255,.04); overflow:hidden;}
+  .grow .gt i{display:block; height:100%; background:var(--grad-progress); opacity:.9;}
+  .grow .gv{font-size:12.5px; color:var(--muted); text-align:right; font-variant-numeric:tabular-nums;}
+
+  footer{position:relative; z-index:2; max-width:var(--w-read); margin:var(--s7) auto 0; padding:var(--s5) var(--s5) var(--s6);
+    border-top:1px solid var(--line); color:var(--muted); font-size:13px;
+    display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap;}
+  footer a{color:var(--ink-dim); text-decoration:none;} footer a:hover{color:var(--accent-2);}
+
+  .rise{opacity:0; transform:translateY(14px); animation:rise .9s var(--ease) forwards;}
+  @keyframes rise{to{opacity:1; transform:none}}
+  .d1{animation-delay:.05s}.d2{animation-delay:.16s}.d3{animation-delay:.28s}.d4{animation-delay:.42s}.d5{animation-delay:.58s}
+  a:focus-visible,.door:focus-visible{outline:2px solid var(--accent); outline-offset:3px; border-radius:6px;}
+  @media(prefers-reduced-motion:reduce){.rise{animation:none;opacity:1;transform:none}.door,.door *{transition:none}}
+  /* server specs — quiet "for the curious" text chart + live storage bar */
+  .specs{margin:var(--section) 0 0; padding:var(--s5) 0 0; border-top:1px solid var(--line);}
+  .chart{max-width:640px; margin-top:4px;}
+  .crow{display:grid; grid-template-columns:104px 1fr; gap:16px; align-items:baseline;
+    padding:8px 0; border-bottom:1px solid color-mix(in srgb, var(--line-c) 6%, transparent); font-size:13.5px;}
+  .crow .ck{font-weight:700;}
+  .crow .cv{color:var(--ink-dim); font-variant-numeric:tabular-nums;}
+  .storage{max-width:640px; margin:16px 0 0; padding:8px 0 0;}
+  .storage .top{display:flex; justify-content:space-between; align-items:baseline; gap:12px;}
+  .storage .ck{font-weight:700;}
+  .storage .sfree{color:var(--ink-dim); font-size:13px; font-variant-numeric:tabular-nums;}
+  .sbar{height:8px; border-radius:8px; background:rgba(255,255,255,.05); border:1px solid var(--line); overflow:hidden; margin-top:9px;}
+  .sbar i{display:block; height:100%; width:0; background:var(--grad-progress); transition:width .9s var(--ease);}
+  .roadmap{font-size:13px; color:var(--muted); margin:22px 0 0; line-height:1.55;}
+  .roadmap .ck{font-weight:700; margin-right:var(--s3);}
+  /* service status — Statuspage-style board (banner + per-service bar timeline) */
+  .uptime{margin:var(--section) 0 0}
+  .uptop{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:16px}
+  .uptop .cap{margin:0}
+  .chip{display:inline-flex; align-items:center; gap:7px; padding:5px 12px; border-radius:var(--r-pill);
+    border:1px solid var(--line); background:var(--bg-soft); font-size:11.5px; font-weight:600; letter-spacing:.02em; color:var(--ink-dim)}
+  .chip .sd{width:7px; height:7px; border-radius:50%; background:var(--muted); flex:none}
+  .chip.live{color:var(--ok-dim); border-color:color-mix(in srgb, var(--ok) 35%, transparent); position:relative} .chip.live .sd{background:var(--ok); animation:spulse 2.2s infinite}
+  /* rotating conic ring on the live status pill — a slow bead of green light
+     travels the border, reading as a heartbeat. @property makes the angle
+     animatable; the two-layer mask paints only the 1px border ring (not the
+     fill). Used sparingly — this single "live" pill is the one earned spot. */
+  @property --ring-a{syntax:'<angle>'; inherits:false; initial-value:0deg;}
+  .chip.live::before{content:""; position:absolute; inset:-1px; border-radius:inherit; padding:1px; pointer-events:none;
+    background:conic-gradient(from var(--ring-a), transparent 0 62%, color-mix(in srgb, var(--ok) 85%, transparent) 80%, var(--ok-dim) 88%, transparent 96%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite:xor; mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); mask-composite:exclude;
+    animation:ringspin 3.6s linear infinite;}
+  @keyframes ringspin{to{--ring-a:360deg;}}
+  @media(prefers-reduced-motion:reduce){.chip.live::before{animation:none; opacity:0;}}
+  .chip.partial{color:var(--warn-dim); border-color:color-mix(in srgb, var(--warn) 40%, transparent)} .chip.partial .sd{background:var(--warn)}
+  .chip.down{color:var(--down-dim); border-color:color-mix(in srgb, var(--down) 40%, transparent)} .chip.down .sd{background:var(--down)}
+  .board{background:color-mix(in srgb, var(--bg) 35%, transparent); border:1px solid var(--line); border-radius:var(--r-lg); padding:6px 18px}
+  .srow{display:grid; grid-template-columns:150px 1fr 62px; align-items:center; gap:16px; padding:13px 0;
+    border-bottom:1px solid color-mix(in srgb, var(--line-c) 7%, transparent)}
+  .srow:last-child{border-bottom:none}
+  .sname{font-size:14px; font-weight:600; color:var(--ink); display:flex; align-items:center; gap:9px; min-width:0}
+  .sname .dot{width:8px; height:8px; border-radius:50%; background:var(--muted); flex:none}
+  .sname .dot.up{background:var(--ok)} .sname .dot.down{background:var(--down)} .sname .dot.deg{background:var(--warn)}
+  .sname .sstate{color:var(--ink-dim); letter-spacing:.04em; margin-left:2px}
+  .sbars{display:flex; gap:3px; align-items:stretch; height:32px}
+  .sbars i{flex:1 1 0; min-width:2px; border-radius:2px; background:color-mix(in srgb, var(--line-c) 6%, transparent)}
+  .sbars i.up{background:var(--ok); opacity:.82} .sbars i.up:hover{opacity:1}
+  .sbars i.deg{background:var(--warn); opacity:.9}
+  .sbars i.down{background:var(--down); opacity:.95}
+  .sup{font-size:12.5px; color:var(--ink-dim); text-align:right; font-variant-numeric:tabular-nums; font-weight:600}
+  .upaxis{display:flex; justify-content:space-between; font-size:11px; color:color-mix(in srgb, var(--line-c) 45%, transparent); margin-top:8px; letter-spacing:.02em}
+  .upaxis .axmid{color:var(--muted)}
+  @keyframes spulse{0%{box-shadow:0 0 0 0 color-mix(in srgb, var(--ok) 50%, transparent)}70%{box-shadow:0 0 0 5px color-mix(in srgb, var(--ok) 0%, transparent)}100%{box-shadow:0 0 0 0 color-mix(in srgb, var(--ok) 0%, transparent)}}
+  @media(prefers-reduced-motion:reduce){.chip .sd{animation:none}}
+  @media(max-width:640px){.srow{grid-template-columns:104px 1fr 50px; gap:10px} .sname .sstate{display:none} .sbars{height:24px; gap:2px}}
+  /* Now a sibling of .np-watchwith inside .np-row (see above), not the only
+     thing in its own row - gap instead of space-between so it doesn't try
+     to claim the whole row width for itself. */
+  .npc .time{display:flex; gap:10px; font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; letter-spacing:.02em;}
+  /* just added — poster rail with aurora synopsis on hover */
+  .added{margin:var(--section) 0 0; display:none;} .added.on{display:block;}
+  .addgrid{display:flex; gap:16px; overflow-x:auto; overflow-y:visible; padding:4px 2px 14px;
+    scroll-snap-type:x proximity; scrollbar-width:thin; scrollbar-color:color-mix(in srgb, var(--accent) 45%, transparent) transparent;
+    /* edge-fade: posters dissolve at the scroll edges instead of hard-cutting
+       under the scrollbar. Horizontal-only gradient (solid full height), so
+       the poster hover-lift into the top padding is never clipped. */
+    -webkit-mask-image:linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);
+    mask-image:linear-gradient(90deg, transparent 0, #000 22px, #000 calc(100% - 22px), transparent 100%);}
+  .addgrid::-webkit-scrollbar{height:8px}
+  .addgrid::-webkit-scrollbar-thumb{background:color-mix(in srgb, var(--accent) 40%, transparent); border-radius:var(--r-sm)}
+  .addgrid::-webkit-scrollbar-track{background:transparent}
+  .pcard{flex:0 0 150px; width:150px; scroll-snap-align:start;}
+  @media(max-width:640px){.pcard{flex:0 0 116px; width:116px;} .addgrid{gap:12px;}}
+  .poster{position:relative; aspect-ratio:2/3; border-radius:var(--r-md); overflow:hidden;
+    background:linear-gradient(160deg,var(--raised-bg),var(--panel-bg)); border:1px solid var(--line);
+    box-shadow:var(--shadow-sm); transition:transform .3s var(--ease), border-color .3s var(--ease), box-shadow .3s var(--ease);}
+  /* Nocturne card hover — cyan edge-light + glow instead of the old plain
+     accent-tinted border, matching the mockup's own .card:hover .poster
+     treatment (border-color + box-shadow off the click-target hue). */
+  .pcard:hover .poster{transform:translateY(-4px); border-color:color-mix(in srgb, var(--cyan) 55%, transparent);
+    box-shadow:var(--shadow-sm), 0 0 22px -8px var(--gc);}
+  /* skeleton shimmer — a soft light sweep across the placeholder gradient
+     while the poster art loads. Sits at z0 behind the image (z1), so once the
+     opaque <img> paints it's covered. Bounded iteration count (not infinite)
+     caps the cost on long catalog scrolls; it settles transparent after. */
+  .poster::before{content:""; position:absolute; inset:0; z-index:0;
+    background:linear-gradient(100deg, transparent 28%, color-mix(in srgb, var(--line-c) 14%, transparent) 48%, rgba(var(--star),.06) 52%, transparent 72%);
+    background-size:220% 100%; animation:shimmer 1.5s ease-in-out 5 both;}
+  .poster img{position:relative; z-index:1; width:100%; height:100%; object-fit:cover; display:block;}
+  .poster .noimg{position:absolute; inset:0; z-index:1; display:flex; align-items:center; justify-content:center; padding:14px;
+    text-align:center; font-family:var(--serif); font-size:19px; color:var(--ink-dim); line-height:1.18;}
+  @keyframes shimmer{from{background-position:120% 0}to{background-position:-120% 0}}
+  @media(prefers-reduced-motion:reduce){.poster::before{animation:none; opacity:0;}}
+  .poster .syn{position:absolute; inset:0; z-index:2; opacity:0; transition:opacity .32s var(--ease); display:flex; align-items:flex-end;
+    background:linear-gradient(to top, color-mix(in srgb, var(--bg) 97%, transparent) 24%, color-mix(in srgb, var(--bg) 86%, transparent) 58%, color-mix(in srgb, var(--bg) 30%, transparent));}
+  .poster:hover .syn, .poster:focus-within .syn{opacity:1;}
+  .syn-in{padding:14px 13px;}
+  .syn-t{font-family:var(--serif); font-weight:600; font-size:17px; line-height:1.14; letter-spacing:-.01em; color:var(--ink);}
+  .syn-g{font-weight:700; margin:6px 0 7px;}
+  .syn-o{font-size:11.5px; color:var(--ink-dim); line-height:1.5; margin:0;
+    display:-webkit-box; -webkit-line-clamp:7; -webkit-box-orient:vertical; overflow:hidden;}
+  .pt{font-size:13px; font-weight:600; letter-spacing:-.01em; margin-top:9px; line-height:1.3;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .py{font-size:11px; color:var(--muted); margin-top:2px; font-variant-numeric:tabular-nums;}
+  /* request prompt under the doors */
+  /* the Request affordance next to the Popular rail — the whole phrase is
+     now one link (was a <p> with a plain-text lead-in + inline <a>) */
+  .reqline{font-size:13.5px; color:var(--link); text-decoration:none; font-weight:600; letter-spacing:.01em;}
+  .reqline:hover{color:var(--link-2);}
+  /* ── Nocturne Stage 2: "the instrument" — the old always-on-the-homepage
+     <details class="sys"> (library stats, service status, hardware spec)
+     moved into a ⌘K-launched overlay (mockup's own "Open the instrument"
+     command: "Live server telemetry, storage & uptime — hidden by
+     default"). This is a container swap only — every id inside
+     (#total/#stats/#spark.../#genre/#uptime/#statuschip/#statusboard/
+     #spec-chart/#stg-txt/#stg-bar/#spec-roadmap) is unchanged and still
+     targeted by the exact same loaders (loadStatic/loadHostSpec/loadStatus/
+     loadUptime), which still run unconditionally at boot exactly as before
+     — they populate the DOM whether or not this overlay is currently open,
+     same as the old <details> populated itself while collapsed. Only the
+     open/close mechanism changed, from <details>/<summary> to the shared
+     .overlay/.sheet modal recipe (openInstrument()/closeInstrument()). */
+  #instrumentlightbox{z-index:80;}
+  .instrumentbox{max-width:860px; width:100%; max-height:88vh; padding:30px 30px 8px;
+    display:flex; flex-direction:column; overflow:hidden;}
+  .instrument-title{font-size:24px; margin:0 0 4px;}
+  .instrument-sub{font-size:13px; color:var(--muted); margin:0 0 18px;}
+  .instrument-scroll{overflow-y:auto; overflow-x:hidden; padding-bottom:26px; margin:0 -6px; padding-left:6px; padding-right:6px;}
+  .instrument-scroll > .ledger{margin-top:0; padding-top:0; border-top:none;}
+  .instrument-scroll .chart{margin-top:18px;}
+
+  /* ── Nocturne Stage 2: ⌘K command palette ─────────────────────────────────
+     Adapted from the mockup's .cmdk/.palette almost verbatim - hub's own
+     --ease/tokens substituted for the mockup's --e/bare hex, .btn reused for
+     the esc hint's sibling affordances rather than inventing new button
+     styling. See openCmdK()/cmdkRender() etc. below for the real wiring
+     (search reuses /api/library/items, same endpoint the catalog view's own
+     search box already calls). */
+  .cmdk{position:fixed; inset:0; z-index:110; display:none; align-items:flex-start; justify-content:center;
+    padding-top:12vh; background:color-mix(in srgb, var(--void) 66%, transparent); backdrop-filter:blur(5px);}
+  .cmdk.on{display:flex; animation:cmdk-fade .18s var(--ease);}
+  @keyframes cmdk-fade{from{opacity:0}}
+  .palette{width:min(94vw,640px); max-height:76vh; display:flex; flex-direction:column; border-radius:var(--r-xl); overflow:hidden;
+    border:1px solid var(--line-strong); background:linear-gradient(180deg,var(--modal-grad-1),var(--modal-grad-2));
+    box-shadow:var(--shadow-lg), 0 0 40px -12px var(--gc); animation:cmdk-pop .2s var(--ease);}
+  @keyframes cmdk-pop{from{opacity:0; transform:translateY(8px) scale(.99)}}
+  @media(prefers-reduced-motion:reduce){.cmdk.on{animation:none;} .palette{animation:none;}}
+  .p-input{display:flex; align-items:center; gap:12px; padding:16px 18px; border-bottom:1px solid var(--line); flex:none;}
+  .p-input svg{width:18px; height:18px; color:var(--muted); flex:none;}
+  .p-input input{flex:1; min-width:0; background:none; border:none; outline:none; color:var(--ink); font:400 16px/1.2 inherit;}
+  .p-input input::placeholder{color:var(--muted);}
+  .p-input .esc{font-size:11px; color:var(--muted); border:1px solid var(--line); border-radius:5px; padding:3px 7px; flex:none;}
+  .p-scroll{overflow:auto; overflow-x:hidden;}
+  .p-group{padding:8px;}
+  .gl{font-size:10px; letter-spacing:.2em; text-transform:uppercase; color:var(--muted); font-weight:700; padding:8px 10px 4px;}
+  .p-item{display:flex; align-items:center; gap:12px; padding:10px; border-radius:var(--r-md); cursor:pointer;}
+  .p-item:hover, .p-item.sel{background:color-mix(in srgb, var(--line-c) 8%, transparent);}
+  .p-item.sel{box-shadow:inset 2px 0 0 0 var(--cyan);}
+  .p-ico{width:30px; height:30px; border-radius:var(--r-sm); flex:none; display:grid; place-items:center; font-size:14px;
+    background:var(--raised-2); border:1px solid var(--line); color:var(--cyan);}
+  .p-ico.m{color:var(--magenta);}
+  .p-main{flex:1; min-width:0;}
+  .p-t{font-size:14px; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .p-s{font-size:12px; color:var(--muted);}
+  .p-item .hint{font-size:11px; color:var(--muted); flex:none;}
+  .p-empty{padding:22px 14px; text-align:center; font-size:13px; color:var(--muted);}
+  .sc{display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:6px 10px 12px;}
+  .sc-col{border:1px solid var(--line); border-radius:var(--r-md); padding:10px 12px; background:color-mix(in srgb, var(--line-c) 3%, transparent);}
+  .sc-col h4{margin:0 0 8px; font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:var(--ink-dim); font-weight:700;}
+  .sc-row{display:flex; align-items:center; justify-content:space-between; padding:5px 0; font-size:12.5px; color:var(--ink-dim);}
+  .sc-row .keys{display:flex; gap:3px;}
+  .sc-row .keys b{font:700 10.5px/1 inherit; background:color-mix(in srgb, var(--line-c) 10%, transparent); border:1px solid var(--line);
+    border-radius:5px; padding:3px 5px; color:var(--platinum-bright);}
+  @media(max-width:640px){.sc{grid-template-columns:1fr;}}
+
+  /* discovery rail group (just-added + popular) — a touch tighter than the
+     full --section rhythm since they're one conceptual "browse more" block,
+     not two unrelated sections. */
+  .discover{display:flex; flex-direction:column; gap:var(--s6); margin:var(--section) 0 0;}
+  .discover .added{margin:0;}
+  .poster{cursor:pointer;}
+  .syn-more{font-weight:700; margin-top:var(--s2);}
+  /* blow-out film window — layout-only now; backdrop/card/shadow/close-button
+     come from .overlay/.sheet/.sheet-close (defined once, above). */
+  .lbox{overflow:hidden; max-width:780px; width:100%; max-height:88vh;
+    display:grid; grid-template-columns:280px 1fr;}
+  @media(max-width:640px){.lbox{grid-template-columns:1fr; max-height:92vh; overflow:auto;}}
+  .lbox .lp{background:var(--panel-bg);}
+  .lbox .lp img{width:100%; height:100%; object-fit:cover; display:block;}
+  .lbox .lp .noimg{display:flex; align-items:center; justify-content:center; height:100%; min-height:360px;
+    padding:18px; text-align:center; font-family:var(--serif); font-size:22px; color:var(--ink-dim);}
+  .lbody{padding:26px 28px 28px; overflow:auto;}
+  .ltitle{font-family:var(--serif); font-weight:600; font-size:30px; line-height:1.05; letter-spacing:-.01em; margin:0 30px 0 0; color:var(--ink);}
+  .lmeta{font-size:13px; color:var(--muted); margin-top:8px; font-variant-numeric:tabular-nums;}
+  .lgen{font-weight:700; margin-top:var(--s3);}
+  .lrate{display:flex; gap:8px; flex-wrap:wrap; margin-top:14px;}
+  .rbadge{display:inline-flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius:var(--r-sm);
+    padding:5px 11px; font-size:13px; font-weight:700; color:var(--ink-dim); font-variant-numeric:tabular-nums;}
+  .rbadge .star{color:var(--accent-2);}
+  .rbadge .rl{font-size:9.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted);}
+  .lsyn{font-size:14px; color:var(--ink-dim); line-height:1.6; margin:18px 0 0;}
+  .lcredits{font-size:12.5px; color:var(--muted); margin-top:16px; line-height:1.6;}
+  .lcredits b{color:var(--ink-dim); font-weight:700; text-transform:uppercase; font-size:9.5px; letter-spacing:.08em; margin-right:5px;}
+  .llinks{display:flex; gap:10px; flex-wrap:wrap; margin-top:22px;}
+  a.pcard{text-decoration:none; color:var(--ink);}
+  .pstatus{position:absolute; top:8px; right:8px; z-index:2; font-size:9.5px; font-weight:700; letter-spacing:.05em;
+    padding:3px 8px; border-radius:var(--r-pill); -webkit-backdrop-filter:blur(4px); backdrop-filter:blur(4px);
+    background:color-mix(in srgb, var(--bg) 72%, transparent); border:1px solid var(--line); color:var(--ink-dim);}
+  .pstatus.want{color:var(--link); border-color:color-mix(in srgb, var(--link) 50%, transparent);}
+  .pstatus.req{color:var(--warn-dim); border-color:color-mix(in srgb, var(--warn) 45%, transparent);}
+  /* Nocturne Stage 2: request breadcrumb chip - CSS only, deliberately
+     unused for now. See loadPopular()'s comment below for why: the real
+     data to drive it (a genuine 4-step per-request pipeline with a live
+     download %) doesn't exist anywhere in this stack today, and faking it
+     would be a worse outcome than not showing it. Ready to wire the moment
+     that data source exists - same class names/shape as the mockup. */
+  .reqchip{display:inline-flex; align-items:center; padding:5px 12px; border-radius:var(--r-pill);
+    border:1px solid var(--line-strong); background:color-mix(in srgb, var(--line-c) 5%, transparent); font-size:11.5px;}
+  .reqchip .lab{color:var(--ink-dim); font-weight:700; margin-right:10px;}
+  .reqchip .crumb{display:flex; align-items:center; gap:7px; color:var(--muted); font-weight:600;}
+  .reqchip .crumb .on{color:var(--cyan);} .reqchip .done{color:var(--ok);} .reqchip .sep{opacity:.4;} .reqchip .s{opacity:.5;}
+  /* catalog view — browse/search/detail, entered via the Catalog door (?view=catalog) */
+  #catalogview{padding:9vh 0 40px;}
+  .libhead{display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin:0 0 26px;}
+  .libtitle{font-family:var(--serif); font-weight:600; font-size:clamp(34px,5.5vw,48px);
+    line-height:1; letter-spacing:-.005em; margin:0; color:var(--ink);}
+  .libback{font-size:13px; font-weight:600; color:var(--link); text-decoration:none; white-space:nowrap;}
+  .libback:hover{color:var(--link-2);}
+  /* type tabs — All / Movies / TV Shows / Anime (primary filter for the Watch view) */
+  .libtabs{display:flex; gap:var(--s2); flex-wrap:wrap; margin:0 0 var(--s4); border-bottom:1px solid var(--line); padding-bottom:2px;}
+  .libtab{background:none; border:none; border-bottom:2px solid transparent; color:var(--muted);
+    font-family:inherit; font-size:14px; font-weight:600; letter-spacing:.01em; padding:8px 14px 10px;
+    cursor:pointer; margin-bottom:-3px; transition:color .2s var(--ease), border-color .2s var(--ease);}
+  .libtab:hover{color:var(--ink-dim);}
+  .libtab.on{color:var(--ink); border-bottom-color:var(--accent);}
+  .libtab:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;}
+  .libcontrols{display:flex; gap:var(--s3); flex-wrap:wrap; margin:0 0 var(--s6);}
+  /* .field (defined once, above) supplies the shared input/select look;
+     this context only adds the row-flex sizing behavior specific to the
+     library filter bar — the login form (below) never opts into this, which
+     is what permanently fixes the old sizing quirk instead of patching it
+     per-form. */
+  .libcontrols .searchfield{flex:1 1 240px; min-width:160px;}
+  .libcontrols select.field{flex:0 0 auto; cursor:pointer;}
+  .libgrid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:22px 16px;}
+  .libstatus{font-size:12.5px; color:var(--muted); text-align:center; margin:26px 0 0; min-height:1em;}
+  .libsentinel{height:1px;}
+  @media(max-width:640px){
+    .libcontrols{gap:var(--s2);} .libcontrols .searchfield{flex:1 1 100%;} .libcontrols select.field{flex:1 1 auto;}
+    .libgrid{grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:16px 12px;}
+  }
+  /* login/logout control (Phase 2a). Actual playback is a separate, later
+     phase — see Media-Forest handoff docs. */
+  .lplay{margin-top:var(--s4); display:flex; align-items:center; gap:var(--s3); flex-wrap:wrap;}
+  .lplay-status{font-size:var(--t-meta); color:var(--ink-dim); font-weight:600;}
+  /* login modal — simpler single-column card, sibling overlay to #lightbox.
+     .sheet (shared) supplies background/border/radius/shadow; this is just
+     the size + internal layout. */
+  .loginbox{max-width:360px; width:100%; padding:30px 26px 26px;}
+  .loginbox .ltitle{font-size:24px; margin:0 0 4px;}
+  .loginbox .lsub{font-size:13px; color:var(--muted); margin:0 0 20px;}
+  /* Its own standalone column layout — deliberately NOT a .libcontrols
+     instance, so it never inherits that context's row-flex input sizing
+     (the permanent fix for the old sizing quirk, vs. patching it per-form). */
+  .loginform{display:flex; flex-direction:column; align-items:stretch; gap:var(--s3);}
+  .loginform .field{width:100%; min-width:0;}
+  .loginform button{align-self:flex-start; margin-top:2px;}
+
+  /* ── UI pass D: watch-together lobby ──────────────────────────────────
+     Real surface (host/join, invite code, participant list) backed by the
+     live SSE sync layer (projects/together.py); the shared-player row is a
+     read-only mirror of the host-driven playback state. Sibling overlay to
+     the other three (.lb recipe via .overlay/.sheet), so it stacks/dismisses
+     the same way. */
+  /* highest of the four overlays — openable from inside the player (90), so
+     it needs to stack above it the same way the player stacks above the
+     detail modal (80). */
+  #togetherlightbox{z-index:95;}
+  .togetherbox{max-width:420px; width:100%; padding:30px 28px 28px;}
+  .together-title{font-size:24px; margin:0 0 4px;}
+  .together-sub{font-size:13px; color:var(--muted); margin:0 0 16px;}
+  .together-error{font-size:13px; color:var(--warn); margin:0 0 16px; line-height:1.5;}
+  .together-join{display:flex; gap:8px; margin:0 0 4px;}
+  .together-join .field{flex:1; text-transform:uppercase; letter-spacing:.06em;}
+  .together-hostbtn{width:100%; margin-top:14px;}
+  .together-code-row{display:flex; gap:10px; align-items:center; margin:0 0 18px;}
+  .together-code{flex:1; font-size:20px; font-weight:700; letter-spacing:.18em; color:var(--ink);
+    background:var(--bg-soft); border:1px solid var(--line); border-radius:var(--r-md);
+    padding:10px 14px; text-align:center; font-variant-numeric:tabular-nums;}
+  .together-people{margin:0 0 18px;}
+  .tp-list{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px;}
+  .tp-chip{display:inline-flex; align-items:center; gap:6px; padding:6px 12px; border-radius:var(--r-pill);
+    border:1px solid var(--line); background:var(--bg-soft); font-size:12.5px; font-weight:600; color:var(--ink-dim);}
+  .tp-chip.host{color:var(--link); border-color:color-mix(in srgb, var(--link) 40%, transparent);}
+  .tp-chip .host-badge{font-size:9px; letter-spacing:.08em; text-transform:uppercase; color:var(--accent-2); font-weight:700;}
+  .together-empty{font-size:12.5px; color:var(--muted); font-style:italic; margin:8px 0 0;}
+  .together-player{border:1px solid var(--line); border-radius:var(--r-md); padding:14px;
+    background:var(--panel-bg); margin:0 0 18px;}
+  .tplay-title{font-size:13.5px; font-weight:600; color:var(--ink);}
+  /* Read-only by design, not inert: sync is real (see together.py's
+     playback broadcast + _pvApplyRemoteCommand()), but the actual controls
+     live in the real player — only the host's ever do anything, and this
+     panel is a status mirror, not a second control surface. pointer-events
+     stays none so it never becomes a confusing dead click target. */
+  .tplay-controls{display:flex; align-items:center; gap:10px; margin-top:10px; pointer-events:none;}
+  .tplay-controls .pv-track{flex:1;}
+  .together-leavebtn{width:100%;}
+
+  /* player overlay (Phase 2b) — stacks above the detail modal (z-index 90 >
+     80) so closing it returns to the still-open detail modal. .sheet
+     supplies border/radius/shadow (background stays opaque black here,
+     intentionally, for video letterboxing — the one deliberate deviation
+     from the shared card gradient). Every control-bar color below is an
+     existing CSS custom property so all 6 themes inherit with zero extra
+     work. */
+  #playerlightbox{z-index:90;}
+  /* container-type on the box (not the overlay) so the control bar can react
+     to the PLAYER'S OWN rendered width (a narrowed desktop window, not just
+     small viewports) — see the @container rules below the control bar. */
+  .pv-box{background:#000; max-width:960px; width:100%; max-height:92vh; overflow:hidden;
+    box-shadow:var(--shadow-lg); container-type:inline-size; container-name:player;}
+  .pv-stage{position:relative; width:100%; aspect-ratio:16/9; background:#000;}
+  .pv-stage video{width:100%; height:100%; display:block; background:#000; object-fit:contain;}
+  /* video-context override of .sheet-close: needs to stay legible over
+     arbitrary video frames rather than the themed panel chip, so it keeps
+     its own translucent-black treatment; radius/size/transition still
+     inherit from the shared component. */
+  .pv-close{position:absolute; top:10px; right:12px; z-index:6; width:32px; height:32px;
+    background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.18); color:#fff;}
+  .pv-close:hover{background:rgba(0,0,0,.75); color:var(--link); border-color:rgba(255,255,255,.18);}
+  .pv-backep{position:absolute; top:10px; left:12px; z-index:6; background:rgba(0,0,0,.55);
+    border:1px solid rgba(255,255,255,.18); color:#fff; border-radius:var(--r-sm); padding:6px 11px;
+    font-size:11.5px; font-weight:600; cursor:pointer;}
+  .pv-backep:hover{background:rgba(0,0,0,.75); color:var(--link);}
+  .pv-title{position:absolute; top:12px; left:14px; right:56px; z-index:5; color:#fff; font-size:14px;
+    font-weight:600; text-shadow:0 1px 6px rgba(0,0,0,.8); pointer-events:none;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .pv-stage.has-backep .pv-title{top:46px;}
+  .pv-loading{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    color:var(--ink-dim); font-size:13px; z-index:4; background:rgba(0,0,0,.35); text-align:center; padding:20px;}
+  /* the class's display:flex outranks the UA [hidden]{display:none}, so hidden
+     alone never hid it — this restores the hide (was: loading stuck on-screen). */
+  .pv-loading[hidden]{display:none;}
+  .pv-controls{position:absolute; left:0; right:0; bottom:0; z-index:5; padding:10px 14px 12px;
+    background:linear-gradient(to top, rgba(0,0,0,.82), rgba(0,0,0,0) 100%);
+    display:flex; flex-direction:column; gap:8px;
+    opacity:1; transition:opacity .25s var(--ease);}
+  /* auto-hide (JS toggles .controls-hidden on #pv-stage during playback after
+     ~3s idle, and tapping the stage — not a control — toggles it directly);
+     the title/back-episode chrome hide with it so a hidden-controls state
+     really reads as "just the video". */
+  .pv-stage.controls-hidden .pv-controls,
+  .pv-stage.controls-hidden .pv-title,
+  .pv-stage.controls-hidden .pv-backep,
+  .pv-stage.controls-hidden .pv-close{opacity:0; pointer-events:none;}
+  .pv-close, .pv-backep, .pv-title{transition:opacity .25s var(--ease);}
+  @media(prefers-reduced-motion:reduce){.pv-controls,.pv-close,.pv-backep,.pv-title{transition:none;}}
+  .pv-row{display:flex; align-items:center; gap:10px;}
+  /* Explicit box, not padding-derived: the old rule (icon + 4px padding, no
+     width/height) shrink-wrapped to a ~26px square on desktop — under every
+     usability minimum (WCAG 2.5.8 wants >=24px; Apple/Google guidance wants
+     >=36-44px) and reportedly needed a precise click to register at all.
+     Setting width/height directly makes the FULL box the hit target
+     (border-box, so padding no longer eats into it) regardless of how the
+     .btn/.pv-btn cascade order shakes out — measured via injected DOM probes
+     (elementFromPoint across the box) to confirm the whole area, not just
+     the icon glyph, is clickable both before and after this change. Mobile's
+     44px media-query bump below still applies on top of this. */
+  .pv-btn{display:flex; align-items:center; justify-content:center; width:36px; height:36px;
+    transition:opacity .2s var(--ease), color .2s var(--ease);}
+  .pv-btn:hover{opacity:1; color:var(--link); border-color:transparent;}
+  /* pointer-events:none so a click always resolves to the button, never its
+     inner <svg>/<path> — keeps e.target === the button for the menu open/close
+     logic (see the outside-click handler in initPlayerControls). */
+  .pv-btn svg{width:18px; height:18px; pointer-events:none;}
+  .pv-time{font-size:11.5px; color:#e8e8f0; font-variant-numeric:tabular-nums; white-space:nowrap;}
+  /* generous invisible hit-area around the thin visual rail — already
+     touch-friendly (16px tall) at every size; widened further on touch
+     viewports below. */
+  .pv-track{position:relative; flex:1; height:16px; display:flex; align-items:center; cursor:pointer; touch-action:none;}
+  .pv-rail{position:relative; width:100%; height:4px; border-radius:4px; background:rgba(255,255,255,.16);}
+  /* buffered-ahead indicator — neutral light grey (YouTube-style), clearly
+     brighter than the rail and dimmer than the themed played bar. */
+  .pv-buffered{position:absolute; left:0; top:0; height:100%; border-radius:4px; width:0;
+    background:rgba(255,255,255,.42);}
+  .pv-played{position:absolute; left:0; top:0; height:100%; border-radius:4px; width:0; background:var(--accent);}
+  .pv-knob{position:absolute; top:50%; width:12px; height:12px; border-radius:50%; background:var(--link);
+    transform:translate(-50%,-50%); left:0%; box-shadow:0 1px 4px rgba(0,0,0,.6);}
+  .pv-vol{width:70px; accent-color:var(--accent); cursor:pointer;}
+  .pv-spacer{flex:1;}
+  .pv-menu{position:absolute; bottom:52px; right:14px; z-index:8; background:var(--panel-bg);
+    border:1px solid var(--line); border-radius:var(--r-md); padding:6px; min-width:170px; display:none;
+    box-shadow:var(--shadow-md); max-height:220px; overflow:auto;}
+  .pv-menu.on{display:block;}
+  /* the control bar reacts to the PLAYER BOX'S OWN width (container query,
+     not a viewport breakpoint) — a desktop window narrowed to a sliver gets
+     the same simplified bar a phone does. Volume collapses behind the mute
+     button (still fully controllable — click/tap mute to toggle silence);
+     the range input just stops competing for space. */
+  @container player (max-width:480px){
+    .pv-vol{display:none;}
+    .pv-row{gap:6px;}
+    .pv-time{font-size:10.5px;}
+  }
+  .pv-menu button{display:block; width:100%; text-align:left; background:none; border:none; padding:7px 10px;
+    border-radius:var(--r-sm); color:var(--ink-dim); font-size:12.5px; cursor:pointer; font-family:inherit;}
+  .pv-menu button:hover{background:color-mix(in srgb, var(--line-c) 12%, transparent); color:var(--ink);}
+  .pv-menu button[aria-pressed="true"]{color:var(--link); font-weight:600;}
+  .pv-menu button:disabled{opacity:.5; cursor:default;}
+  .pv-menu button:disabled:hover{background:none; color:var(--ink-dim);}
+  /* quality-menu preset: primary label + a muted resolution/bitrate hint on
+     its own line (e.g. "1080p" / "High · 8 Mbps"). */
+  .pv-menu-sub{display:block; font-size:11px; font-weight:400; color:var(--ink-dim); margin-top:1px;}
+  .pv-menu button[aria-pressed="true"] .pv-menu-sub{color:var(--ink-dim);}
+  /* series episode picker — shares the catalog grid's card visual language */
+  .pv-picker{padding:20px 22px 22px; max-height:92vh; overflow:auto; background:var(--panel-bg);}
+  .pv-seasons{display:flex; gap:8px; flex-wrap:wrap; margin:0 0 16px;}
+  .pv-season-btn{background:var(--bg-soft); border:1px solid var(--line); color:var(--ink-dim); border-radius:var(--r-pill);
+    padding:6px 14px; font-size:12.5px; font-weight:600; cursor:pointer; transition:.2s var(--ease); font-family:inherit;}
+  .pv-season-btn:hover{color:var(--ink); border-color:color-mix(in srgb, var(--accent) 50%, transparent);}
+  .pv-season-btn[aria-pressed="true"]{color:var(--bg); background:var(--accent); border-color:var(--accent);}
+  .pv-eplist{display:flex; flex-direction:column; gap:10px;}
+  .pv-ep{display:flex; gap:12px; padding:10px; border-radius:var(--r-md); border:1px solid var(--line);
+    background:var(--bg-soft); cursor:pointer; transition:background .2s var(--ease), border-color .2s var(--ease);
+    text-align:left; width:100%; font-family:inherit; color:inherit;}
+  .pv-ep:hover{background:var(--raised-bg); border-color:color-mix(in srgb, var(--accent) 40%, transparent);}
+  .pv-ep-thumb{flex:0 0 120px; width:120px; aspect-ratio:16/9; border-radius:var(--r-sm); overflow:hidden;
+    background:var(--panel-bg); border:1px solid var(--line);}
+  .pv-ep-thumb img{width:100%; height:100%; object-fit:cover; display:block;}
+  .pv-ep-body{flex:1; min-width:0;}
+  .pv-ep-title{font-size:13.5px; font-weight:600; color:var(--ink);}
+  .pv-ep-title .se{color:var(--accent-2); margin-right:6px; font-variant-numeric:tabular-nums;}
+  .pv-ep-meta{font-size:11.5px; color:var(--muted); margin-top:3px;}
+  .pv-ep-ov{font-size:11.5px; color:var(--ink-dim); margin-top:5px; line-height:1.45;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;}
+  .pv-ep-resume{height:3px; border-radius:3px; background:rgba(255,255,255,.1); margin-top:8px; overflow:hidden;}
+  .pv-ep-resume i{display:block; height:100%; background:var(--accent);}
+  /* ── mobile video player (UI pass B) ──────────────────────────────────────
+     The weakest responsive spot before this pass. Below 640px the player
+     goes near-fullscreen: dvh/dvw so mobile browser chrome (the address bar
+     that grows/shrinks on scroll) never clips it the way vh/vw would, no
+     rounded corners/gutter, touch-sized (>=44px) controls, a taller scrub
+     hit-area, and the subtitle menu becomes a bottom sheet instead of a
+     small floating panel. Landscape phones get the same treatment — dvh
+     still fills the actual usable height either orientation. */
+  @media(max-width:640px){
+    #playerlightbox.overlay{padding:0;}
+    .pv-box{width:100dvw; height:100dvh; max-width:100dvw; max-height:100dvh;
+      border-radius:0; display:flex; flex-direction:column;}
+    .pv-stage{flex:1; width:100%; height:100%; aspect-ratio:unset; min-height:0;}
+    .pv-picker{max-height:100dvh; height:100dvh;}
+    /* every control gets a real >=44px touch target, not just a bigger icon */
+    .pv-btn{width:44px; height:44px;}
+    .pv-close, .pv-backep{width:44px; height:44px;}
+    .pv-close{top:max(8px, env(safe-area-inset-top)); right:max(8px, env(safe-area-inset-right));}
+    .pv-backep{top:max(8px, env(safe-area-inset-top)); left:max(8px, env(safe-area-inset-left));
+      display:flex; align-items:center;}
+    .pv-controls{padding:8px max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom))
+      max(10px, env(safe-area-inset-left));}
+    /* taller invisible hit-area around the same thin visual rail */
+    .pv-track{height:44px;}
+    .pv-time{font-size:12.5px;}
+    /* subtitle menu -> bottom sheet: full-width, anchored to the bottom edge,
+       rounded only on top, scrollable if the list is long. */
+    .pv-menu{position:fixed; left:0; right:0; bottom:0; top:auto; z-index:12;
+      border-radius:var(--r-lg) var(--r-lg) 0 0; padding:10px max(10px, env(safe-area-inset-left));
+      min-width:0; max-height:min(60dvh, 420px);
+      padding-bottom:max(10px, env(safe-area-inset-bottom));}
+    .pv-menu button{padding:12px 12px; font-size:14px;}
+    .pv-ep-thumb{flex:0 0 88px; width:88px;}
+  }
+  /* landscape phones specifically (short viewport, wide) — same near-
+     fullscreen treatment; dvh already fills the true usable height. */
+  @media(max-height:500px) and (orientation:landscape){
+    #playerlightbox.overlay{padding:0;}
+    .pv-box{width:100dvw; height:100dvh; max-width:100dvw; max-height:100dvh; border-radius:0;}
+    .pv-btn{width:44px; height:44px;}
+  }
+
+  /* ══ envelope-pushing pass — modern-CSS flourishes ═════════════════════════
+     All progressive enhancements: guarded by @supports / @media so any
+     browser without the feature falls back to the plain (already-good) look,
+     and every animation yields to prefers-reduced-motion. */
+
+  /* metallic sheen — a bronze specular band drifts across the wordmark and the
+     gate headline. Theme-aware: the gradient is built from each theme's own
+     --ink / --link-2 / --accent-2, so it shimmers gold on Forest, cyan on
+     Retrowave, etc. Child elements (the h1 .bar divider) keep their own color
+     because background-clip:text only recolors the element's OWN text. */
+  @supports ((-webkit-background-clip:text) or (background-clip:text)){
+    .sheen{
+      background:linear-gradient(100deg,
+        var(--ink) 30%, var(--link-2) 44%, var(--accent-2) 50%, var(--link-2) 56%, var(--ink) 70%);
+      background-size:220% 100%;
+      -webkit-background-clip:text; background-clip:text; color:transparent;
+      animation:sheen 7s ease-in-out infinite;}
+    @keyframes sheen{0%{background-position:120% 0} 50%{background-position:-20% 0} 100%{background-position:120% 0}}
+    @media(prefers-reduced-motion:reduce){.sheen{animation:none; background-position:50% 0;}}
+  }
+
+  /* scroll-driven reveal — sections rise + fade AS THEY ENTER the viewport
+     (native scroll timeline, no JS/observer). Elements above the fold at load
+     are already past the entry range, so they simply show. No-support
+     browsers get no base opacity:0, so content is always visible there. */
+  @supports (animation-timeline:view()){
+    @media(prefers-reduced-motion:no-preference){
+      .reveal{animation:reveal-rise linear both; animation-timeline:view(); animation-range:entry 4% cover 22%;}
+      @keyframes reveal-rise{from{opacity:0; transform:translateY(28px)} to{opacity:1; transform:none}}
+    }
+  }
+
+  /* View Transitions — the poster→detail morph and catalog cross-fade. Tune
+     the shared-element timing; keep the whole-page root fade quick so opening
+     the catalog reads as a soft dissolve, not a slow wipe. */
+  @media(prefers-reduced-motion:no-preference){
+    ::view-transition-group(film-poster){animation-duration:.42s; animation-timing-function:var(--ease);}
+    ::view-transition-old(film-poster),::view-transition-new(film-poster){
+      animation-duration:.42s; animation-timing-function:var(--ease); mix-blend-mode:normal;}
+    ::view-transition-old(root),::view-transition-new(root){animation-duration:.28s;}
+  }
+
+  /* ── Accessibility pass ───────────────────────────────────────────────────
+     1. Skip link. With the header, the three doors and several rails, a
+        keyboard user otherwise tabs through ~20 controls before reaching any
+        content. Visually hidden until focused, then pinned top-left over
+        everything (z-index clears the gate at 1200). */
+  .skip-link{position:fixed; top:-100px; left:var(--s3); z-index:1300;
+    padding:10px 18px; border-radius:var(--r-md);
+    background:var(--neon); color:var(--void); font-weight:700; font-size:var(--t-meta);
+    text-decoration:none; box-shadow:var(--shadow-md); transition:top .16s var(--ease);}
+  .skip-link:focus{top:var(--s3); color:var(--void);}
+  @media(prefers-reduced-motion:reduce){.skip-link{transition:none;}}
+
+  /* 2. Touch targets. The compact desktop sizing is deliberate and stays as
+        it is — this only applies where the primary input is a finger, which
+        is exactly the case the 44px guidance (iOS HIG / Material 48dp, and
+        WCAG 2.5.5) is about. Audited at 375px, the offenders were the theme
+        icon button (32x32), both gate form fields and the Sign in button
+        (~33-39px tall), the header buttons, and the per-door "Request ->"
+        links. `pointer:coarse` rather than a width breakpoint so a touch
+        laptop or tablet in landscape gets the same treatment.
+        min-height (not height) so nothing that is already taller shrinks. */
+  @media (pointer: coarse){
+    .btn, .authbtn, .lbtn, button.lbtn, .field, .libtab,
+    .door-main, .door-req, .menu-item, .search, .reqline, .skip-link{
+      min-height:44px;
+    }
+    /* Inline-flex centers the label once these grow past their padding. */
+    .door-req, .reqline{display:inline-flex; align-items:center;}
+    .iconbtn{width:44px; height:44px;}
+    /* The icon inside keeps its original visual size — only the hit area grew. */
+    .iconbtn svg{width:20px; height:20px;}
+    .libtab{padding-top:10px; padding-bottom:10px;}
+    /* Player transport row: same reasoning, and these sit over video where a
+       mis-tap is especially annoying. */
+    .pv-btn{width:44px; height:44px;}
+  }
+
+/* ── sign-in gate ──────────────────────────────────────────────────────────
+   Was a second inline <style> in the body. Moved here so index.html carries no
+   CSS at all; the markup it styles (#gate) is unchanged. The gate is the
+   public "homepage": opaque, themed, covering the whole app while signed out
+   (body.locked). Enforcement is app.py's /api/* session middleware — this is
+   only the UX half. */
+body.locked{overflow:hidden;}
+    #gate{position:fixed; inset:0; z-index:1200; display:none;
+      align-items:center; justify-content:center; padding:var(--s5,24px);
+      background:
+        radial-gradient(1100px 620px at 50% -12%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 68%),
+        var(--bg);}
+    body.locked #gate{display:flex;}
+    .gate-card{width:min(92vw,432px); text-align:center;
+      display:flex; flex-direction:column; gap:var(--s3,12px);
+      padding:clamp(26px,5vw,44px);
+      border:1px solid var(--line); border-radius:var(--r-xl,20px);
+      background:var(--bg-soft); box-shadow:var(--shadow-lg);}
+    .gate-title{font-family:var(--serif); font-weight:600;
+      font-size:clamp(30px,5.5vw,46px); line-height:1.04; margin:0; color:var(--ink);}
+    .gate-sub{color:var(--muted); margin:0 0 var(--s2,8px); font-size:var(--t-body,15px);}
+    .gate-card .loginform{display:flex; flex-direction:column; gap:var(--s2,8px); margin-top:var(--s1,4px);}
+    .gate-card .field{width:100%;}
+    .gate-card .lbtn{width:100%;}
+    .gate-status{min-height:1.1em; margin:var(--s1,4px) 0 0; font-size:var(--t-meta,13px); color:var(--muted);}

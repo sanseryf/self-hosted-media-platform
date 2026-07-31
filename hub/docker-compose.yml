@@ -1,0 +1,21 @@
+# Hub — apex landing page + SQL project host.
+# Joins the shared 'datanet' network to reach Postgres by container name.
+# One-time on the server:  docker network create datanet
+services:
+  hub:
+    build: .
+    container_name: hub
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - TZ=${TZ:-UTC}
+    ports:
+      - "8090:8080"      # NPM proxies the apex (example.org) -> here
+    volumes:
+      # read-WRITE: the stats collector reads; audit_collect.py purges empty folders
+      - /srv/media/media:/data/media
+    networks: [datanet]
+
+networks:
+  datanet:
+    external: true

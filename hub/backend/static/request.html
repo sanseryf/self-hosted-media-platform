@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Request — Media Hub</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23FF2E9A'/%3E%3Cstop offset='1' stop-color='%2335E8FF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='7' fill='%2305070D'/%3E%3Crect x='14.6' y='7' width='2.8' height='18' rx='1.4' fill='url(%23g)'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/tokens.css"/>
+<style>
+  .wrap{max-width:var(--w-wide); margin:0 auto; padding:clamp(24px,5vw,56px) clamp(16px,4vw,40px);}
+  header.top{margin-bottom:var(--s5);}
+  h1{font-family:var(--serif); font-weight:600; font-size:clamp(30px,5vw,52px); margin:var(--s1) 0 0; letter-spacing:-.01em;}
+  .searchbar{display:flex; align-items:center; gap:var(--s3); margin:var(--s5) 0 var(--s6);
+    background:var(--raised); border:1px solid var(--line); border-radius:var(--r-pill); padding:4px 6px 4px var(--s4); max-width:640px;}
+  .searchbar:focus-within{border-color:color-mix(in srgb,var(--cyan) 45%,transparent); box-shadow:0 0 0 3px color-mix(in srgb,var(--cyan) 12%,transparent);}
+  .searchbar svg{width:18px; height:18px; color:var(--muted); flex:none;}
+  .searchbar input{flex:1; background:none; border:none; outline:none; color:var(--ink); font:inherit; font-size:var(--t-body); padding:10px 0;}
+  .searchbar input::placeholder{color:var(--muted);}
+  .hint{color:var(--muted); font-size:var(--t-meta);}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:var(--s5);}
+  .card{background:linear-gradient(180deg,var(--raised) 0%,var(--surface) 100%); border:1px solid var(--line);
+    border-radius:var(--r-lg); overflow:hidden; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; animation:rise .35s var(--ease) both;}
+  @keyframes rise{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
+  .poster{aspect-ratio:2/3; width:100%; object-fit:cover; background:var(--raised-2); display:block;}
+  .body{padding:var(--s3); display:flex; flex-direction:column; gap:6px; flex:1;}
+  .t{font-family:var(--serif); font-size:var(--t-body); font-weight:600; line-height:1.2;
+    overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;}
+  .yr{font-size:var(--t-eyebrow); letter-spacing:.12em; text-transform:uppercase; color:var(--muted);}
+  .req{margin-top:auto; border:1px solid var(--line-strong); background:transparent; color:var(--ink);
+    border-radius:var(--r-sm); padding:7px 10px; font:inherit; font-size:var(--t-meta); font-weight:600; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; gap:6px; transition:all .2s var(--ease);}
+  .req:hover:not(:disabled){border-color:var(--cyan); color:var(--cyan);}
+  .req:disabled{cursor:default; opacity:.85;}
+  .req.done{border-color:transparent; background:color-mix(in srgb,var(--ok) 18%,transparent); color:var(--ok-dim);}
+  .req.have{border-color:transparent; background:color-mix(in srgb,var(--ink) 8%,transparent); color:var(--ink-dim);}
+  .req.pending{border-color:transparent; background:color-mix(in srgb,var(--warn) 16%,transparent); color:var(--warn-dim);}
+  .req.err{border-color:var(--down); color:var(--down);}
+
+  .empty{grid-column:1/-1; border:1px dashed var(--line-strong); border-radius:var(--r-lg);
+    padding:var(--s8) var(--s5); text-align:center; color:var(--ink-dim);}
+  .empty h2{font-family:var(--serif); font-weight:600; color:var(--ink); margin:0 0 var(--s2);}
+  .empty a{color:var(--link); font-weight:600;}
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <p class="eyebrow neon">Media Hub · Request</p>
+      <h1>Request anything</h1>
+    </header>
+
+    <div class="searchbar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input id="q" type="search" autocomplete="off" placeholder="Search movies & shows to request…" aria-label="Search"/>
+    </div>
+
+    <div class="grid" id="grid"></div>
+    <div class="empty hidden" id="msg"></div>
+  </div>
+
+<script>
+  try { var t = localStorage.getItem('mf-theme'); if (t && t !== 'default') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+
+  var grid = document.getElementById('grid'), msg = document.getElementById('msg'), qEl = document.getElementById('q');
+  function esc(x){ return (x==null?'':String(x)).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function showMsg(html){ msg.innerHTML = html; msg.classList.remove('hidden'); }
+  function hideMsg(){ msg.classList.add('hidden'); }
+
+  // status -> button state
+  function btnFor(row){
+    var s = row.status;
+    if (s === 'available') return {cls:'have', label:'Available', disabled:true};
+    if (s === 'pending' || s === 'processing' || s === 'partial') return {cls:'pending', label:'Requested', disabled:true};
+    return {cls:'', label:'＋ Request', disabled:false};
+  }
+
+  function card(row){
+    var el = document.createElement('div'); el.className='card';
+    var b = btnFor(row);
+    el.innerHTML =
+      (row.poster ? '<img class="poster" src="'+esc(row.poster)+'" alt="" loading="lazy"/>' : '<div class="poster"></div>') +
+      '<div class="body">' +
+        '<div class="t">'+esc(row.title)+'</div>' +
+        '<div class="yr">'+(row.type==='tv'?'Series':'Film')+(row.year?' · '+esc(row.year):'')+'</div>' +
+        '<button class="req '+b.cls+'"'+(b.disabled?' disabled':'')+'>'+esc(b.label)+'</button>' +
+      '</div>';
+    var btn = el.querySelector('.req');
+    if (!b.disabled) btn.addEventListener('click', function(){ requestIt(row, btn); });
+    return el;
+  }
+
+  function requestIt(row, btn){
+    btn.disabled = true; btn.className = 'req'; btn.textContent = 'Requesting…';
+    fetch('/api/request/submit', {method:'POST', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({tmdb_id: row.id, media_type: row.type})})
+      .then(function(r){ if(r.status===401){ throw 'auth'; } return r.json(); })
+      .then(function(d){
+        if (d.ok){ btn.className='req done'; btn.textContent = d.already ? 'Already requested' : 'Requested ✓'; }
+        else { btn.className='req err'; btn.textContent = 'Failed — retry'; btn.disabled=false;
+               btn.onclick=function(){ requestIt(row, btn); }; }
+      })
+      .catch(function(e){
+        if (e === 'auth'){ showMsg('<h2>Sign in to request</h2><p><a href="/">Head to the front door</a> and log in.</p>'); return; }
+        btn.className='req err'; btn.textContent='Failed — retry'; btn.disabled=false; btn.onclick=function(){ requestIt(row, btn); };
+      });
+  }
+
+  function render(items){
+    grid.innerHTML='';
+    if (!items.length){ showMsg('<h2>No matches</h2><p>Try a different title.</p>'); return; }
+    hideMsg();
+    items.forEach(function(row){ grid.appendChild(card(row)); });
+  }
+
+  var timer, lastQ='';
+  function doSearch(){
+    var q = qEl.value.trim();
+    if (q === lastQ) return; lastQ = q;
+    if (q.length < 2){ grid.innerHTML=''; hideMsg(); return; }
+    fetch('/api/request/search?q='+encodeURIComponent(q)+'&limit=24', {credentials:'same-origin'})
+      .then(function(r){ if(r.status===401){ throw 'auth'; } return r.json(); })
+      .then(function(d){ if(d.ok) render(d.items || []); else showMsg('<h2>Search unavailable</h2><p>'+esc(d.error||'')+'</p>'); })
+      .catch(function(e){ if(e==='auth') showMsg('<h2>Sign in to request</h2><p><a href="/">Head to the front door</a> and log in.</p>'); });
+  }
+  qEl.addEventListener('input', function(){ clearTimeout(timer); timer = setTimeout(doSearch, 300); });
+  qEl.focus();
+</script>
+</body>
+</html>

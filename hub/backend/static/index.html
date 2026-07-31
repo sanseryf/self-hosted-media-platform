@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Media Hub</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23FF2E9A'/%3E%3Cstop offset='1' stop-color='%2335E8FF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='7' fill='%2305070D'/%3E%3Crect x='14.6' y='7' width='2.8' height='18' rx='1.4' fill='url(%23g)'/%3E%3C/svg%3E">
+<meta name="theme-color" content="#05070D">
+<meta name="description" content="Everything you watch and read, gathered in one place — open all night.">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Media Hub">
+<meta property="og:title" content="Media Hub">
+<meta property="og:description" content="Everything you watch and read, gathered in one place — open all night.">
+<meta property="og:url" content="https://example.org">
+<meta property="og:image" content="https://example.org/static/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Media Hub">
+<meta name="twitter:description" content="Everything you watch and read, in one place.">
+<meta name="twitter:image" content="https://example.org/static/og.png">
+<link rel="stylesheet" href="/static/tokens.css">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body class="locked">
+<script>
+  // Apply any saved theme choice immediately, before anything below paints,
+  // so a reload never flashes the default palette first. Keep this in sync
+  // with the THEMES array further down (same storage key, same attribute).
+  //
+  // Nocturne migration: the old six theme keys (retrowave/vampire/matrix/
+  // bladerunner2049/lofigirl, plus 'default' itself) don't exist as
+  // [data-theme] blocks anymore — a returning visitor's saved key needs to
+  // land on its nearest new equivalent, not silently break or fall through
+  // to an unstyled/missing theme. Mapped per the new roster's own stated
+  // lineage (Ember = refreshed Vampire, etc.); retrowave's magenta/cyan
+  // pairing is closest to Nocturne itself, the new default. Persisted back
+  // to localStorage so this migration only ever runs once per visitor, not
+  // on every load. Any other unrecognized key (garbage, a future rollback,
+  // manual tampering) falls back to the default rather than guessing.
+  (function(){
+    try{
+      var MIGRATE = {retrowave:'default', vampire:'ember', matrix:'phosphor', bladerunner2049:'sodium', lofigirl:'dusk'};
+      var VALID = ['default','grid','ember','phosphor','sodium','dusk'];
+      var t = localStorage.getItem('mf-theme');
+      if(t && Object.prototype.hasOwnProperty.call(MIGRATE, t)){
+        t = MIGRATE[t];
+        localStorage.setItem('mf-theme', t);
+      }
+      if(t && VALID.indexOf(t) === -1){
+        t = 'default';
+        localStorage.setItem('mf-theme', t);
+      }
+      if(t && t !== 'default') document.documentElement.setAttribute('data-theme', t);
+    }catch(e){}
+  })();
+</script>
+  <!-- First focusable thing on the page. Targets #homeview (the doors + rails),
+       i.e. the first actual content after the header/search/account chrome. -->
+  <a class="skip-link" href="#homeview">Skip to content</a>
+
+  <div class="stage" aria-hidden="true">
+    <svg class="canopy" viewBox="0 0 1440 200" preserveAspectRatio="none"><path d="M0,0 H1440 V60 C1410,150 1380,70 1340,110 C1300,150 1270,55 1220,95 C1180,135 1150,60 1110,100 C1075,140 1040,75 1000,105 C965,150 930,80 890,115 C855,145 820,55 780,95 C745,135 710,70 670,110 C635,150 600,60 560,100 C525,140 490,75 450,105 C415,145 380,55 340,95 C305,135 270,70 230,110 C195,150 160,60 120,100 C85,140 45,75 0,105 Z"/></svg>
+    <div class="grid"></div>
+    <div class="floor"></div><div class="vig"></div>
+  </div>
+
+  
+  <div id="gate" role="dialog" aria-modal="true" aria-label="Sign in to Media Hub">
+    <div class="gate-card">
+      <p class="wordmark wordmark--lg">Media<span class="bar">|</span>Hub</p>
+      <h2 class="gate-title sheen">Welcome back.</h2>
+      <p class="gate-sub">Sign in to enter the forest.</p>
+      <form class="loginform" id="gateform" onsubmit="return submitGateLogin(event)">
+        <input type="text" class="field" id="gate-user" name="username" placeholder="Username"
+          autocomplete="username" autocapitalize="none" spellcheck="false" required>
+        <input type="password" class="field" id="gate-pass" name="password" placeholder="Password"
+          autocomplete="current-password" required>
+        <button type="submit" class="lbtn">Sign in</button>
+      </form>
+      <p class="gate-status" id="gate-status" role="status"></p>
+    </div>
+  </div>
+
+  <div class="wrap wrap--wide" id="topwrap">
+    <header id="topbar">
+      <div class="topline rise d1">
+        <h1 class="h1home wordmark sheen" onclick="goHome()" role="link" tabindex="0" title="Back to home"
+            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goHome();}">Media<span class="bar">|</span>Hub</h1>
+        <!-- Nocturne Stage 2: ⌘K trigger. This button never itself does the
+             work - openCmdK() (below) does, same function the global
+             keydown listener calls, so there's one single open path. -->
+        <button type="button" class="search" id="searchTrigger" onclick="openCmdK()" aria-label="Search and commands">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <span>Search titles, or type a command…</span>
+          <span class="kbd"><b>Ctrl</b><b>K</b></span>
+        </button>
+        <div class="topright">
+          <button type="button" class="btn btn--accent" onclick="openWatchTogether()" title="Join or host a watch-together room">Watch together</button>
+          <div class="hmenu" id="appearance">
+            <button type="button" class="iconbtn" id="appearanceBtn" aria-haspopup="true" aria-expanded="false" aria-label="Appearance and theme" onclick="toggleAppearance(event)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v18a9 9 0 0 0 0-18z" fill="currentColor" stroke="none"/></svg>
+            </button>
+            <div class="menu appearance-menu" id="appearanceMenu" role="menu" hidden>
+              <div class="menu-label">Theme</div>
+              <div class="theming" id="themepicker" role="group" aria-label="Color theme"></div>
+              <!-- Privacy section — only shown to signed-in members (unhidden by
+                   applyPrefsToUI() once /api/prefs/me resolves). The one control
+                   for now is watch-together's hot-join opt-in. -->
+              <div class="pref-section" id="prefSection" hidden>
+                <div class="menu-label">Privacy</div>
+                <label class="pref-row" for="pref-hotjoin">
+                  <span class="pref-copy">
+                    <span class="pref-title">Let others watch with me</span>
+                    <span class="pref-note">Adds a “Watch with me” button to your Now Playing card so friends can join your stream. Off keeps your viewing to yourself.</span>
+                  </span>
+                  <span class="pref-switch">
+                    <input type="checkbox" id="pref-hotjoin" role="switch" aria-label="Let others watch with me" onchange="setHotJoinPref(this.checked)">
+                    <span class="pref-switch-track" aria-hidden="true"></span>
+                  </span>
+                </label>
+              </div>
+            </div>
+          </div>
+          <div class="authbox" id="authbox"></div>
+        </div>
+      </div>
+    </header>
+  </div>
+
+  <!-- streaming-app redesign: rotating hero banner — full-bleed, so it lives
+       outside .wrap's max-width. Hides along with #homeview when the catalog
+       view is open (openCatalog()/closeCatalog() toggle it the same way). -->
+  <section class="hero rise d2" id="hero" aria-label="Featured">
+    <div id="hero-slides"></div>
+  </section>
+
+  <!-- discovery + catalog get the wide track (.wrap--wide) so the poster
+       grids gain columns on ultrawide for free (auto-fill,minmax already
+       does the rest). -->
+  <!-- discovery: continue-watching + now-playing + just-added + popular.
+       Member-facing, kept prominent and tightened (see .discover below) —
+       this is the whole point of the page after the hero banner. -->
+  <!-- tabindex="-1" so the skip link can move focus here; without it the
+       browser scrolls to the anchor but leaves focus parked in the header, so
+       the next Tab drops the user straight back into the chrome they skipped. -->
+  <div class="wrap wrap--wide" id="homeview" tabindex="-1">
+    <nav class="doors rise d2" aria-label="Explore">
+      <div class="door">
+        <a class="door-main" href="/" onclick="event.preventDefault(); openCatalog();">
+          <span class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2.5" y="4" width="19" height="14" rx="2.5"/><path d="M10 8.5v5l4-2.5z" fill="currentColor" stroke="none"/><path d="M8 21h8"/></svg></span>
+          <span><span class="dt">Watch</span><span class="ds">Browse films &amp; series</span></span>
+        </a>
+        <a class="door-req" href="https://request.example.org" target="_blank" rel="noopener" title="Request a movie or show (Jellyseerr)">Request &rarr;</a>
+      </div>
+      <div class="door">
+        <a class="door-main" href="https://read.example.org" target="_blank" rel="noopener">
+          <span class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v18H6.5A2.5 2.5 0 0 0 4 22.5z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/></svg></span>
+          <span><span class="dt">Read</span><span class="ds">Books &amp; comics</span></span>
+        </a>
+        <a class="door-req" href="https://browse.example.org" target="_blank" rel="noopener" title="Request a book">Request &rarr;</a>
+      </div>
+      <div class="door">
+        <a class="door-main" href="https://listen.example.org" target="_blank" rel="noopener">
+          <span class="di"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="2.5" y="13.5" width="4" height="7" rx="2"/><rect x="17.5" y="13.5" width="4" height="7" rx="2"/><path d="M20 18.5v1a3 3 0 0 1-3 3h-3"/></svg></span>
+          <span><span class="dt">Listen</span><span class="ds">Audiobooks</span></span>
+        </a>
+        <a class="door-req" href="https://browse.example.org" target="_blank" rel="noopener" title="Request an audiobook">Request &rarr;</a>
+      </div>
+    </nav>
+    <section class="cw rise d3" id="cw" aria-label="Continue watching">
+      <div class="railhead"><p class="cap">Continue watching</p></div>
+      <div class="addgrid" id="cwgrid"></div>
+    </section>
+
+    <section class="now rise d3" id="now" aria-label="Now playing">
+      <!-- design-review #3: a plain card grid under a normal railhead (like
+           Continue Watching), not a giant decorative ring. #nowgrid is
+           re-rendered by refreshNow() below — one .npc card per session,
+           whether that's 1 viewer or several. -->
+      <div class="railhead"><p class="cap">Now playing<span class="live" id="livedot" aria-hidden="true"></span></p></div>
+      <div class="nowgrid" id="nowgrid"></div>
+    </section>
+
+    <div class="discover rise d3 reveal">
+      <section class="added" id="added" aria-label="Recently added">
+        <div class="railhead">
+          <p class="cap">Recently added</p>
+          <button type="button" class="btn btn--sm" onclick="event.preventDefault(); openCatalog();">Browse the library &rarr;</button>
+        </div>
+        <div class="addgrid" id="addgrid"></div>
+      </section>
+
+      <section class="added" id="popular" aria-label="Popular to request">
+        <div class="railhead">
+          <p class="cap">Popular — request anything</p>
+          <a class="reqline" id="requestlink" href="https://request.example.org" target="_blank" rel="noopener">Can’t find something? Request it &rarr;</a>
+        </div>
+        <div class="addgrid" id="popgrid"></div>
+      </section>
+    </div>
+
+  </div>
+
+  <div class="wrap wrap--wide">
+    <section id="catalogview" hidden aria-label="Catalog">
+      <div class="libhead">
+        <h2 class="libtitle">Watch</h2>
+        <div style="display:flex; align-items:center; gap:18px; flex-wrap:wrap;">
+          <p class="applink" id="applink"></p>
+          <a href="/" class="libback" onclick="event.preventDefault(); closeCatalog();">← Back home</a>
+        </div>
+      </div>
+      <div class="libtabs" id="lib-tabs" role="tablist" aria-label="Filter by type">
+        <button type="button" class="libtab on" data-type="all" role="tab" aria-selected="true">All</button>
+        <button type="button" class="libtab" data-type="movie" role="tab" aria-selected="false">Movies</button>
+        <button type="button" class="libtab" data-type="series" role="tab" aria-selected="false">TV Shows</button>
+        <button type="button" class="libtab" data-type="anime" role="tab" aria-selected="false">Anime</button>
+      </div>
+      <div class="libcontrols">
+        <label class="searchfield" for="lib-q">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="search" id="lib-q" placeholder="Search titles…" aria-label="Search the library">
+        </label>
+        <select class="field" id="lib-genre" aria-label="Filter by genre"><option value="">All genres</option></select>
+        <select class="field" id="lib-sort" aria-label="Sort by">
+          <option value="added">Recently added</option>
+          <option value="title">Title A–Z</option>
+          <option value="year">Year</option>
+          <option value="rating">Rating</option>
+        </select>
+      </div>
+      <div class="libgrid" id="libgrid"></div>
+      <p class="libstatus" id="libstatus"></p>
+      <div class="libsentinel" id="libsentinel"></div>
+    </section>
+
+  </div>
+
+  <footer>
+    <span>Sign in once at <a href="https://id.example.org" target="_blank" rel="noopener">id.example.org</a> — access flows to every door.</span>
+    <!-- Nocturne Stage 2: Books (Read via Kavita + Request via the book service)
+         moved out of its own homepage <details> disclosure into two quiet
+         dashed-outline "cutout" links here, matching the mockup's single
+         "Books & comics →" footer link. Two, not one, deliberately —
+         hub has two genuinely distinct destinations (read vs. request), and
+         collapsing to one would drop real functionality (no more direct
+         Kavita link) rather than just changing where it lives. Populated by
+         the same loadServices()/renderServices() that used to target
+         #books-body - see that function for the conditional-rows logic. -->
+    <span class="footer-books" id="footer-books"></span>
+    <span>Media Hub</span>
+  </footer>
+
+  <div class="overlay" id="lightbox" role="dialog" aria-modal="true" aria-label="Film details">
+    <div class="lbox sheet">
+      <button class="sheet-close" onclick="closeFilm()" aria-label="Close">✕</button>
+      <div class="lp" id="lbox-poster"></div>
+      <div class="lbody" id="lbox-body"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="loginlightbox" role="dialog" aria-modal="true" aria-label="Log in">
+    <div class="loginbox sheet">
+      <button class="sheet-close" onclick="closeLogin()" aria-label="Close">✕</button>
+      <h3 class="ltitle">Log in</h3>
+      <p class="lsub">Sign in with your Media Hub Jellyfin account.</p>
+      <form class="loginform" id="loginform" onsubmit="return submitLogin(event)">
+        <input type="text" class="field" id="login-user" name="username" placeholder="Username"
+          autocomplete="username" required>
+        <input type="password" class="field" id="login-pass" name="password" placeholder="Password"
+          autocomplete="current-password" required>
+        <button type="submit" class="lbtn">Log in</button>
+      </form>
+      <p class="libstatus" id="login-status"></p>
+    </div>
+  </div>
+
+  <!-- Nocturne Stage 2: "the instrument" — the old always-visible <details
+       class="sys"> System zone, now a ⌘K-launched overlay (see the CSS
+       block's comment for the full "why," and openInstrument()/
+       closeInstrument() below). Every id inside is unchanged from the old
+       <details> markup — same loaders, same targets, just a different
+       container. -->
+  <div class="overlay" id="instrumentlightbox" role="dialog" aria-modal="true" aria-label="The instrument">
+    <div class="instrumentbox sheet">
+      <button class="sheet-close" onclick="closeInstrument()" aria-label="Close">✕</button>
+      <h3 class="instrument-title">The instrument</h3>
+      <p class="instrument-sub">Live server telemetry, storage &amp; uptime.</p>
+      <div class="instrument-scroll">
+        <section class="ledger" aria-label="The library tonight">
+          <div>
+            <p class="cap">The library, tonight</p>
+            <div class="big"><span id="total">—</span><span class="u">titles under the canopy</span></div>
+            <svg class="spark" id="spark" width="220" height="34" viewBox="0 0 220 34" fill="none" aria-hidden="true">
+              <path id="sparkpath" d="M0 30 L220 30" stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              <circle id="sparkdot" cx="220" cy="30" r="2.6" fill="var(--accent-2)"/>
+            </svg>
+          </div>
+          <div class="stats" id="stats"></div>
+        </section>
+
+        <section class="genre" id="genre" aria-label="Watch time by genre">
+          <p class="cap">Watch time by genre</p>
+          <div id="genrelist"></div>
+        </section>
+
+        <section class="uptime" id="uptime" aria-label="Service status">
+          <div class="uptop">
+            <p class="cap">Service status</p>
+            <span class="chip" id="statuschip"><span class="sd"></span><span id="statustxt">checking…</span></span>
+          </div>
+          <div class="board" id="statusboard"></div>
+          <div class="upaxis"><span id="upstart">30 days ago</span><span class="axmid">daily uptime</span><span id="upend">today</span></div>
+        </section>
+
+        <div class="chart" id="spec-chart"><div class="crow"><span class="cv">reading spec…</span></div></div>
+        <div class="storage">
+          <div class="top"><span class="ck">Storage</span><span class="sfree" id="stg-txt">reading disk…</span></div>
+          <div class="sbar"><i id="stg-bar"></i></div>
+        </div>
+        <p class="roadmap" id="spec-roadmap"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Nocturne Stage 2: ⌘K command palette. #cmdk-scroll is entirely
+       re-rendered by cmdkRender() below from window._cmdk's state - search
+       reuses the same /api/library/items endpoint the catalog view's own
+       search box already calls, real title data, not mocked. -->
+  <div class="cmdk" id="cmdk" role="dialog" aria-modal="true" aria-label="Command palette">
+    <div class="palette">
+      <div class="p-input">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="cmdInput" placeholder="Search a title, or type a command…" autocomplete="off">
+        <span class="esc">esc</span>
+      </div>
+      <div class="p-scroll" id="cmdk-scroll"></div>
+    </div>
+  </div>
+
+  <!-- UI pass D + real-time sync backend: watch-together lobby. Room
+       lifecycle (host/join/leave) and the live roster are real, backed by
+       together.py's in-memory rooms + an SSE stream. Playback command sync
+       (play/pause/seek broadcast to the shared-player block below) is still
+       deferred — the endpoint exists server-side but isn't called yet, see
+       together.py's module docstring. #together-body is entirely
+       re-rendered by renderLobby() from window._room, unchanged in shape
+       since pass D. -->
+  <div class="overlay" id="togetherlightbox" role="dialog" aria-modal="true" aria-label="Watch together">
+    <div class="togetherbox sheet">
+      <button class="sheet-close" onclick="closeWatchTogether()" aria-label="Close">✕</button>
+      <div id="together-body"></div>
+    </div>
+  </div>
+
+  <div class="overlay" id="playerlightbox" role="dialog" aria-modal="true" aria-label="Player">
+    <div class="pv-box sheet">
+      <div class="pv-stage" id="pv-stage">
+        <button class="pv-backep" id="pv-backep" onclick="pvBackToEpisodes()" hidden>&larr; Episodes</button>
+        <button class="sheet-close pv-close" onclick="closePlayer()" aria-label="Close player">&#10005;</button>
+        <div class="pv-title" id="pv-title"></div>
+        <video id="pv-video" playsinline></video>
+        <div class="pv-loading" id="pv-loading" hidden>Loading&hellip;</div>
+        <div class="pv-controls" id="pv-controls">
+          <div class="pv-row">
+            <!-- role="slider" requires the value trio; without it a screen
+                 reader announces a slider with no position at all. Kept in
+                 sync by pvUpdateSeekAria() on every timeupdate. aria-valuetext
+                 carries a spoken "3:24 of 1:47:10" rather than a bare percent. -->
+            <div class="pv-track" id="pv-track" role="slider" aria-label="Seek" tabindex="0"
+                 aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="0:00">
+              <div class="pv-rail">
+                <div class="pv-buffered" id="pv-buffered"></div>
+                <div class="pv-played" id="pv-played"></div>
+                <div class="pv-knob" id="pv-knob"></div>
+              </div>
+            </div>
+          </div>
+          <div class="pv-row">
+            <button class="btn pv-btn" id="pv-playbtn" onclick="pvTogglePlay()" aria-label="Play or pause"></button>
+            <span class="pv-time"><span id="pv-cur">0:00</span>&nbsp;/&nbsp;<span id="pv-dur">0:00</span></span>
+            <span class="pv-spacer"></span>
+            <button class="btn pv-btn" id="pv-togetherbtn" onclick="openWatchTogether()" aria-label="Watch together"></button>
+            <button class="btn pv-btn" id="pv-audiobtn" onclick="pvToggleAudioMenu()" aria-label="Audio track" hidden></button>
+            <button class="btn pv-btn" id="pv-subbtn" onclick="pvToggleSubMenu()" aria-label="Subtitles" hidden></button>
+            <button class="btn pv-btn" id="pv-qualitybtn" onclick="pvToggleQualityMenu()" aria-label="Streaming quality"></button>
+            <button class="btn pv-btn" id="pv-mutebtn" onclick="pvToggleMute()" aria-label="Mute"></button>
+            <input type="range" class="pv-vol" id="pv-vol" min="0" max="1" step="0.01" value="1" aria-label="Volume">
+            <button class="btn pv-btn" id="pv-fsbtn" onclick="pvToggleFullscreen()" aria-label="Fullscreen"></button>
+          </div>
+        </div>
+        <div class="pv-menu" id="pv-audiomenu"></div>
+        <div class="pv-menu" id="pv-submenu"></div>
+        <div class="pv-menu" id="pv-qualitymenu"></div>
+      </div>
+      <div class="pv-picker" id="pv-picker" hidden></div>
+    </div>
+  </div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

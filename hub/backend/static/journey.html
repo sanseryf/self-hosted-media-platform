@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Request Journey — Media Hub</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23FF2E9A'/%3E%3Cstop offset='1' stop-color='%2335E8FF'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='7' fill='%2305070D'/%3E%3Crect x='14.6' y='7' width='2.8' height='18' rx='1.4' fill='url(%23g)'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/tokens.css"/>
+<style>
+  .wrap{max-width:var(--w-read); margin:0 auto; padding:clamp(24px,5vw,56px) clamp(16px,4vw,40px);}
+  header.top{display:flex; align-items:baseline; justify-content:space-between; gap:var(--s4); flex-wrap:wrap; margin-bottom:var(--s6);}
+  h1{font-family:var(--serif); font-weight:600; font-size:clamp(30px,5vw,52px); margin:var(--s1) 0 0; letter-spacing:-.01em;}
+  .toggle{font-size:var(--t-meta); color:var(--ink-dim); cursor:pointer; user-select:none; border:1px solid var(--line);
+    padding:6px 12px; border-radius:var(--r-pill); background:transparent;}
+  .toggle:hover{border-color:var(--line-strong); color:var(--ink);}
+  .toggle[aria-pressed="true"]{color:var(--cyan); border-color:color-mix(in srgb,var(--cyan) 40%,transparent);}
+
+  .list{display:flex; flex-direction:column; gap:var(--s4);}
+  .item{background:linear-gradient(180deg, var(--raised) 0%, var(--surface) 100%);
+    border:1px solid var(--line); border-radius:var(--r-lg); padding:var(--s5); box-shadow:var(--shadow-sm);}
+  .head{display:flex; align-items:baseline; justify-content:space-between; gap:var(--s3); cursor:pointer;}
+  .name{font-family:var(--serif); font-size:var(--t-lead); font-weight:600; line-height:1.2;}
+  .name small{font-family:var(--sans); font-size:var(--t-eyebrow); letter-spacing:.14em; text-transform:uppercase; color:var(--muted); margin-left:var(--s2);}
+  .flag{font-size:var(--t-eyebrow); letter-spacing:.1em; text-transform:uppercase; font-weight:700; padding:3px 9px; border-radius:var(--r-pill); white-space:nowrap;}
+  .flag.ok{color:var(--void); background:var(--ok);}
+  .flag.stalled{color:var(--void); background:var(--warn);}
+  .flag.dead{color:var(--void); background:var(--down);}
+
+  /* stepper */
+  .steps{display:flex; align-items:center; margin-top:var(--s5); gap:0;}
+  .step{flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; position:relative; min-width:0;}
+  .step .dot{width:16px; height:16px; border-radius:var(--r-pill); background:var(--raised-2);
+    border:2px solid var(--line-strong); z-index:1; transition:all .3s var(--ease);}
+  .step.done .dot{background:var(--grad-progress); border-color:transparent; box-shadow:0 0 12px -2px var(--gm);}
+  .step.active .dot{background:var(--cyan); border-color:transparent; box-shadow:0 0 14px -1px var(--gc);
+    transform:scale(1.35);}
+  .step .lbl{font-size:9.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); text-align:center;}
+  .step.done .lbl, .step.active .lbl{color:var(--ink-dim);}
+  .step.active .lbl{color:var(--cyan);}
+  .step .line{position:absolute; top:8px; left:-50%; width:100%; height:2px; background:var(--line-strong); z-index:0;}
+  .step.done .line, .step.active .line{background:var(--grad-progress);}
+  .step:first-child .line{display:none;}
+
+  .timeline{margin-top:var(--s5); padding-top:var(--s4); border-top:1px solid var(--line);
+    display:none; flex-direction:column; gap:var(--s2);}
+  .item.open .timeline{display:flex;}
+  .trow{display:flex; gap:var(--s3); font-size:var(--t-meta); color:var(--ink-dim); align-items:baseline;}
+  .trow time{color:var(--muted); font-variant-numeric:tabular-nums; min-width:150px;}
+  .trow b{color:var(--ink); font-weight:600;} .trow .src{color:var(--cyan);}
+
+  .empty{border:1px dashed var(--line-strong); border-radius:var(--r-lg); padding:var(--s8) var(--s5); text-align:center; color:var(--ink-dim);}
+  .empty h2{font-family:var(--serif); font-weight:600; color:var(--ink); margin:0 0 var(--s2);}
+  .empty a{font-weight:600;}
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <div>
+        <p class="eyebrow neon">Media Hub · Your Requests</p>
+        <h1>Request Journey</h1>
+      </div>
+      <button class="toggle" id="scope" aria-pressed="false">Mine only</button>
+    </header>
+
+    <div class="list" id="list"></div>
+
+    <div class="empty hidden" id="empty">
+      <h2>No requests tracked yet</h2>
+      <p>Request something from <a href="/">the front door</a> and watch it move through here — from requested all the way to playing.</p>
+    </div>
+    <div class="empty hidden" id="signin">
+      <h2>Sign in to see your journey</h2>
+      <p><a href="/">Head to the front door</a> and log in.</p>
+    </div>
+  </div>
+
+<script>
+  try { var t = localStorage.getItem('mf-theme'); if (t && t !== 'default') document.documentElement.setAttribute('data-theme', t); } catch (e) {}
+
+  var LADDER = ['requested','grabbed','downloading','downloaded','available','played'];
+  var LABELS = {requested:'Requested', grabbed:'Grabbed', downloading:'Downloading', downloaded:'Downloaded', available:'Available', played:'Played'};
+  var listEl = document.getElementById('list');
+  var empty = document.getElementById('empty');
+  var signin = document.getElementById('signin');
+  var scopeBtn = document.getElementById('scope');
+  var me = null, mineOnly = true, allTitles = [];
+
+  function esc(x){ return (x==null?'':String(x)).replace(/[&<>"]/g, function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+  function when(iso){ if(!iso) return ''; try{ return new Date(iso).toLocaleString([], {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}); }catch(e){ return iso; } }
+
+  function stepper(state){
+    var side = (state==='failed'||state==='deleted');
+    var curIdx = LADDER.indexOf(state);
+    var html = '<div class="steps">';
+    LADDER.forEach(function(st, i){
+      var cls = 'step'; if(!side){ if(i<curIdx) cls+=' done'; else if(i===curIdx) cls+=' active'; }
+      html += '<div class="'+cls+'"><span class="line"></span><span class="dot"></span><span class="lbl">'+LABELS[st]+'</span></div>';
+    });
+    return html + '</div>';
+  }
+
+  function flag(tt){
+    if(tt.state==='failed') return '<span class="flag dead">failed</span>';
+    if(tt.state==='deleted') return '<span class="flag dead">removed</span>';
+    if(tt.stalled) return '<span class="flag stalled">stalled '+(tt.hours_in_state!=null?Math.round(tt.hours_in_state)+'h':'')+'</span>';
+    if(tt.state==='available'||tt.state==='played') return '<span class="flag ok">ready</span>';
+    return '';
+  }
+
+  function itemEl(tt){
+    var el = document.createElement('div'); el.className='item'; el.dataset.id = tt.id;
+    el.innerHTML =
+      '<div class="head">'+
+        '<div class="name">'+esc(tt.title||'Untitled')+'<small>'+esc(tt.media_type||'')+'</small></div>'+
+        flag(tt)+
+      '</div>'+ stepper(tt.state) +
+      '<div class="timeline" id="tl-'+tt.id+'"><div class="trow">Loading timeline…</div></div>';
+    el.querySelector('.head').addEventListener('click', function(){ toggleTimeline(el, tt.id); });
+    return el;
+  }
+
+  function toggleTimeline(el, id){
+    var open = el.classList.toggle('open');
+    if(!open) return;
+    fetch('/api/lifecycle/title/'+id, {credentials:'same-origin'})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        var tl = document.getElementById('tl-'+id);
+        var rows = (d.timeline||[]);
+        tl.innerHTML = rows.length ? rows.map(function(t){
+          return '<div class="trow"><time>'+when(t.at)+'</time><span><span class="src">'+esc(t.source||'')+'</span> → <b>'+esc(t.to)+'</b></span></div>';
+        }).join('') : '<div class="trow">No transitions recorded.</div>';
+      }).catch(function(){});
+  }
+
+  function draw(){
+    var titles = allTitles.filter(function(t){ return !mineOnly || (me && t.requested_by === me); });
+    listEl.innerHTML=''; titles.forEach(function(t){ listEl.appendChild(itemEl(t)); });
+    empty.classList.toggle('hidden', titles.length>0);
+  }
+
+  scopeBtn.addEventListener('click', function(){
+    mineOnly = !mineOnly;
+    scopeBtn.setAttribute('aria-pressed', String(!mineOnly));
+    scopeBtn.textContent = mineOnly ? 'Mine only' : 'Everyone';
+    draw();
+  });
+
+  Promise.all([
+    fetch('/api/auth/me', {credentials:'same-origin'}).then(function(r){ return r.json(); }).catch(function(){ return {}; }),
+    fetch('/api/lifecycle/titles?limit=200', {credentials:'same-origin'}).then(function(r){ if(r.status===401){ throw 'auth'; } return r.json(); })
+  ]).then(function(res){
+    me = (res[0] && res[0].user && res[0].user.username) || null;
+    if(!me){ // logged out
+      signin.classList.remove('hidden'); return;
+    }
+    allTitles = (res[1] && res[1].titles) || [];
+    draw();
+  }).catch(function(){ signin.classList.remove('hidden'); });
+</script>
+</body>
+</html>

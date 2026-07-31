@@ -1,0 +1,11 @@
+{
+  "_comment": "Hardware spec shown under hub's 'Under the hood' panel. Hand-maintained (not queryable from inside a container without new host mounts/coupling to devops-console) but now lives in one JSON file behind /api/stats/host-spec instead of hardcoded HTML rows - see Stage 5 (S1).",
+  "rows": [
+    {"key": "compute", "label": "Compute", "value": "Intel Core i7-8700 · 6C / 12T · 3.2 GHz"},
+    {"key": "memory", "label": "Memory", "value": "16 GB DDR4"},
+    {"key": "graphics", "label": "Graphics", "value": "NVIDIA RTX 3060 Ti · Intel UHD 630 (Quick Sync)"},
+    {"key": "network", "label": "Network", "value": "1 GbE · Intel I219-V"},
+    {"key": "platform", "label": "Platform", "value": "Ubuntu 24.04 · Docker · Tailscale"}
+  ],
+  "roadmap": "Storage pool — mergerfs + SnapRAID with parity as the drives fill · considering a 2.5 GbE NIC for faster local transfers."
+}

@@ -1,0 +1,170 @@
+/* tokens.css — the Nocturne design tokens and page base.
+   THE single source of truth, loaded by every page: index.html, wall.html,
+   journey.html and request.html all <link> this file.
+
+   It used to be a hand-kept copy of index.html's inline :root block, with a
+   comment asking whoever edited one to remember to edit the other. That drifted
+   almost immediately — index.html softened the --gm/--gc glow tints from 50%
+   to 36% and this file never got the change, so the member pages rendered
+   noticeably harder glows than the homepage for as long as both copies existed.
+   The duplication is now gone rather than re-synced: index.html links this file
+   like everything else. Edit colours here and every surface follows. */
+
+:root{
+    /* ── Nocturne token system ─────────────────────────────────────────────
+       Neon primitives (--void/--bg1/--bg2/--magenta/--violet/--cyan/--neon/
+       --platinum/--gm/--gc) are the real source of truth now — copied
+       verbatim from the approved mockup (scratchpad/nocturne.html). Every
+       existing semantic token below them (--bg/--accent/--link/etc.) is a
+       live var() reference INTO those primitives, not a second copy of a
+       color: a [data-theme] block only ever overrides the primitives, and
+       the whole page re-resolves through this one indirection layer. That's
+       deliberate, and is what keeps "one block re-skins the whole page" true
+       even though every existing component rule (hundreds of them, in this
+       Stage-1 pass) still reads the ORIGINAL token names — this is a visual
+       reskin, not a rename; nothing downstream had to change to pick up the
+       new palette. */
+    --void:#03040A; --bg1:#0B1020; --bg2:#070A13;
+    --surface:#0A0E17; --raised:#0F1420; --raised-2:#151C2B;
+    --magenta:#FF2E9A; --violet:#8A5CFF; --cyan:#35E8FF;
+    /* One gradient rule for the whole page (design-review #2/#7): a single
+       2-stop magenta→cyan. --neon is the diagonal brand fill (buttons,
+       wordmark, eyebrow); --grad-progress is the horizontal variant every
+       data/progress bar reads, so "progress" and "emphasis" look identical
+       everywhere. The old 3-stop (magenta→violet→cyan) neon and the per-bar
+       linear-gradient(--accent,--accent-2) sprawl are both gone; --violet
+       still exists as a discrete token (type badges, decorative floor) but is
+       no longer a gradient mid-stop. */
+    --neon:linear-gradient(120deg,var(--magenta) 0%,var(--cyan) 100%);
+    --grad-progress:linear-gradient(90deg,var(--magenta),var(--cyan));
+    --platinum:#AFC4E6; --platinum-bright:#D3E1F6;
+    /* glow tints — softened from 50%→36% for a more ambient, diffuse neon that
+       melts into the dark rather than reading as a hard neon sign. Every glow on
+       the page reads through these two tokens, so this one change softens them
+       all consistently (bars, chips, buttons, avatar, cards, cmdk). */
+    --gm:color-mix(in srgb,var(--magenta) 36%,transparent);
+    --gc:color-mix(in srgb,var(--cyan) 36%,transparent);
+    /* Nocturne Stage 2 fidelity pass: mockup's exact font stacks, copied
+       verbatim (scratchpad/nocturne.html's own --serif/--sans). Replaces the
+       Google-Fonts Cormorant Garamond + Inter pairing the first Stage-2 port
+       pulled in instead — every font-family declaration below now reads one
+       of these two vars rather than hardcoding a family name, so this one
+       pair is the entire typeface surface. */
+    --serif:"Hoefler Text","Cambria","Georgia",serif;
+    --sans:"Segoe UI Variable Display","Segoe UI",system-ui,-apple-system,sans-serif;
+
+    /* ── legacy semantic names — every existing rule in this file keeps
+       reading these; only their definitions changed, from hardcoded hex to
+       var() chains into the primitives above. */
+    --bg:var(--void); --bg-soft:var(--surface);
+    /* --muted was #5F7391, which measured 4.24:1 on --void and 4.00:1 on
+       --surface — under WCAG AA's 4.5:1 for normal text. It is not decorative:
+       it carries .gate-sub (15px), the door subtitles .ds (13px) and .pref-note
+       (11px), none of which qualify for the large-text allowance. #7488A6 is
+       the same blue-grey three steps lighter and clears 4.5:1 on every surface
+       in the system, including the lightest panel --raised-2 (4.72:1). */
+    --ink:#EAF2FF; --ink-dim:#9BB0CC; --muted:#7488A6;
+    --line-c:#78B4EB; --line:color-mix(in srgb, var(--line-c) 12%, transparent);
+    --line-strong:color-mix(in srgb, var(--line-c) 22%, transparent);
+    /* body backdrop radial-gradient stops (theme-following, like the old
+       system) — panel/modal chrome below is deliberately NOT theme-tinted,
+       matching the mockup's own choice to keep glass/panel surfaces neutral
+       and let border/text/glow carry the theme signal instead (see the
+       .npc cards and .palette, neither of which vary per [data-theme]). */
+    --grad-1:var(--bg1); --grad-2:var(--bg2);
+    --raised-bg:var(--raised); --panel-bg:var(--surface);
+    --modal-grad-1:#111826; --modal-grad-2:#0A0E17;
+    --star:var(--platinum);
+    --accent:var(--magenta);
+    --accent-2:color-mix(in srgb, var(--violet) 55%, var(--magenta) 45%);
+    /* click-target hue — the mockup's own cyan, exactly the role --link
+       already played (Request link, watch-together CTAs, external buttons),
+       so every existing "do something" affordance just follows it through. */
+    --link:var(--cyan); --link-2:color-mix(in srgb, var(--cyan) 70%, white 30%);
+    /* semantic ok/warn/down deliberately stay OUT of the neon primitives and
+       out of every [data-theme] block below — status meaning (a service is
+       actually down, a request actually failed) must never shift just
+       because someone picked a new color scheme. */
+    --warn:#FFC24B; --warn-dim:color-mix(in srgb, var(--warn) 65%, white 35%);
+    --ok:#35E8A0; --ok-dim:color-mix(in srgb, var(--ok) 65%, white 35%);
+    --down:#FF5470; --down-dim:color-mix(in srgb, var(--down) 65%, white 35%);
+    /* now-playing type badges (Film/TV/Anime) — movie reuses --accent-2, tv/
+       anime get their own quiet hues, still neon-family so they follow theme */
+    --badge-tv:var(--violet);
+    --badge-anime:color-mix(in srgb, var(--cyan) 45%, var(--violet) 55%);
+    --ease:cubic-bezier(.22,.7,.16,1);
+
+    /* ── design-system scales (theme-agnostic — live once, every theme
+       inherits) ────────────────────────────────────────────────────────
+       UI-pass A: spacing/radius/type scales replace the ad-hoc per-feature
+       px sprawl that had crept in feature-by-feature. New components/
+       components should reach for these first. */
+    --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px; --s7:48px; --s8:96px;
+    /* fluid vertical rhythm between top-level homepage sections */
+    --section: clamp(40px, 6vw, 72px);
+    --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px; --r-pill:999px;
+    --t-eyebrow:10.5px; --t-cap:12px; --t-meta:13px; --t-body:15px; --t-lead: clamp(17px,2vw,20px);
+    /* shared shadow tokens — replaces one-off rgba(0,0,0,.x) shadows scattered
+       across modals/cards/posters so depth reads consistently */
+    --shadow-sm:0 10px 26px -16px rgba(0,0,0,.85);
+    --shadow-md:0 12px 30px -12px rgba(0,0,0,.75);
+    --shadow-lg:0 34px 90px -34px rgba(0,0,0,.9);
+    /* prose-width vs. wide discovery/grid track. --w-wide widened to reach
+       an ultrawide's corners, matching the mockup's own --wrap exactly;
+       --w-read (modals/prose measure) is untouched — not part of this ask. */
+    --w-read: min(92vw, 1080px);
+    --w-wide: min(95vw, 2040px);
+  }
+
+  /* ── Nocturne theme roster ─────────────────────────────────────────────
+     Six [data-theme] blocks, each only ever overriding the neon primitives
+     (+ --ink, for Phosphor's brighter green-white text) — everything else on
+     the page (--bg/--accent/--link/every glow below) is a var() chain rooted
+     in these, so this really is the entire re-skin surface. Hex values
+     copied verbatim from the approved mockup's own [data-theme] blocks. */
+  /* Grid — pure Tron: electric blue -> cyan, cold */
+  [data-theme="grid"]{--magenta:#2E9BFF; --violet:#3B82F6; --cyan:#6EE7FF; --bg1:#081428; --bg2:#050B16; --void:#03060E;}
+  /* Ember — crimson -> amber, warm (was Vampire) */
+  [data-theme="ember"]{--magenta:#FF3B5C; --violet:#FF6B3D; --cyan:#FFAE4B; --bg1:#1A0A12; --bg2:#0D0508; --void:#080406;}
+  /* Phosphor — terminal green -> lime (was Matrix) */
+  [data-theme="phosphor"]{--magenta:#2BFF9E; --violet:#7CFF4D; --cyan:#C6FF3A; --bg1:#04160E; --bg2:#030C08; --void:#020805; --ink:#E6FFEF;}
+  /* Sodium — amber <-> teal duotone (was Blade Runner 2049) */
+  [data-theme="sodium"]{--magenta:#FF9E3A; --violet:#E8B35A; --cyan:#35D6E8; --bg1:#141007; --bg2:#0A0805; --void:#070604;}
+  /* Dusk — soft rose -> violet, gentle (was Lofi Girl) */
+  [data-theme="dusk"]{--magenta:#FF9DBE; --violet:#C89CFF; --cyan:#8FD9FF; --bg1:#140E1E; --bg2:#0B0812; --void:#08060E;}
+
+  /* Neon glow is universal now, on every theme — not theme-gated the way the
+     old palette special-cased retrowave/matrix/bladerunner2049 (and left
+     vampire/lofigirl glow-free). That was the right call for a "gothic vs.
+     genre-accurate CRT" system; it's the wrong call for Nocturne, whose
+     whole aesthetic IS crisp neon glow — so this is one small base-rule
+     addition instead of six duplicated theme-gated blocks, entirely
+     color-mixed from --gm/--gc so it still just follows whichever theme is
+     active, per the mockup's own pattern. */
+  .bar, .ledger .big{text-shadow:0 0 26px var(--gm);}
+  .reqline:hover, .lbtn:hover{text-shadow:0 0 18px var(--gc);}
+  .chip.live{box-shadow:0 0 12px -2px color-mix(in srgb, var(--ok) 55%, transparent);}
+  .chip.down{box-shadow:0 0 12px -2px color-mix(in srgb, var(--down) 55%, transparent);}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  /* Base surface beneath everything. The body gradient below uses
+     background-attachment:fixed, which on mobile detaches during rubber-band
+     overscroll and exposes the root element — with no background on <html>
+     that exposed strip paints white (the reported "white on the sides and
+     bottom when you scroll"). Painting the themed --bg onto <html>, clamping
+     overscroll, and hiding any x-overflow means every edge shows the dark
+     canvas, never a white gap. */
+  html{background:var(--bg); overflow-x:hidden; overscroll-behavior:none;}
+  body{
+    background:radial-gradient(120% 90% at 50% -10%, var(--grad-1) 0%, var(--grad-2) 42%, var(--bg) 78%) fixed, var(--bg);
+    color:var(--ink); font-family:var(--sans);
+    font-size:15px; line-height:1.6; -webkit-font-smoothing:antialiased;
+    position:relative; overflow-x:hidden; min-height:100vh; min-height:100dvh;
+  }
+
+/* Shared bits the member pages reuse (names match index.html's usage). */
+.eyebrow{font-size:var(--t-eyebrow); letter-spacing:.28em; text-transform:uppercase;
+  color:var(--muted); font-weight:700; margin:0;}
+.eyebrow.neon{background:var(--neon); -webkit-background-clip:text; background-clip:text; color:transparent;}
+a{color:var(--link); text-decoration:none;}
+a:hover{color:var(--link-2);}
