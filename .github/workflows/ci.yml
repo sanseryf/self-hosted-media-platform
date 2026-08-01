@@ -1,0 +1,99 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Hub test suite
+    runs-on: ubuntu-latest
+
+    # The suite is split between pure-logic tests (parsers, state machine,
+    # caches — these run anywhere) and integration tests that need a real
+    # Postgres, because what they actually verify is a windowed indexed query.
+    # Mocking that would only test the mock, so CI brings a database.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: hub
+          POSTGRES_PASSWORD: hub
+          POSTGRES_DB: hub_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U hub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: hub/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r hub/requirements.txt
+
+      - name: Compile-check every module
+        # Catches syntax errors in files no test happens to import.
+        run: python -m compileall -q hub/backend
+
+      - name: Run test suite
+        env:
+          DATABASE_URL: postgres://hub:hub@localhost:5432/hub_test
+        # Each test file is a standalone script that exits non-zero on failure
+        # (the house convention — see any tests/test_*.py header). Loop rather
+        # than a runner so one failing suite fails the job while the rest still
+        # report, which makes a red build readable at a glance.
+        run: |
+          failed=0
+          for f in hub/backend/tests/test_*.py; do
+            echo "::group::$f"
+            if python "$f"; then
+              echo "PASS $f"
+            else
+              echo "::error file=$f::test suite failed"
+              failed=1
+            fi
+            echo "::endgroup::"
+          done
+          exit $failed
+
+  frontend:
+    name: Static asset checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: index.html carries no inline CSS/JS bundle
+        # index.html was a 263 KB single file; CSS and JS now live in
+        # app.css/app.js so they can be cached independently of the markup.
+        # This guards the split from quietly regressing. The one permitted
+        # inline <script> is the pre-paint theme bootstrap, which has to be
+        # inline to avoid flashing the default palette.
+        run: |
+          html=hub/backend/static/index.html
+          styles=$(grep -c '<style>' "$html" || true)
+          scripts=$(grep -c '<script>' "$html" || true)
+          size=$(stat -c%s "$html")
+          echo "index.html: ${size} bytes, ${styles} inline <style>, ${scripts} inline <script>"
+          [ "$styles" -eq 0 ] || { echo "::error::inline <style> reintroduced into index.html"; exit 1; }
+          [ "$scripts" -le 1 ] || { echo "::error::more than the one allowed inline <script>"; exit 1; }
+          [ "$size" -lt 60000 ] || { echo "::error::index.html has grown past 60 KB — is a bundle inline again?"; exit 1; }
+
+      - name: Design tokens are defined in exactly one place
+        # tokens.css and index.html used to hold duplicate copies of the same
+        # :root block and drifted (the glow tints desynced). Fail if a second
+        # definition reappears anywhere in static/.
+        run: |
+          count=$(grep -l -- '--magenta:#' hub/backend/static/*.css hub/backend/static/*.html 2>/dev/null | wc -l)
+          echo "files defining the palette: $count"
+          grep -l -- '--magenta:#' hub/backend/static/*.css hub/backend/static/*.html 2>/dev/null || true
+          [ "$count" -eq 1 ] || { echo "::error::design tokens defined in more than one file"; exit 1; }
