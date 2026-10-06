@@ -122,17 +122,18 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # aspirational: index.html uses inline <style>/<script> and inline on* handlers
 # throughout, so 'unsafe-inline' is required until that markup changes — the
 # split into /static/app.css + /static/app.js removes the big blocks but the
-# inline event handlers remain. img-src allows data: for the inline SVG favicon
-# and blob: for hls.js media, and media-src/connect-src allow the Jellyfin
-# public origin because the <video> element streams directly from it (see
-# playback.py's "token-in-URL" note). frame-ancestors 'none' is the real
+# inline event handlers remain. img-src allows data: for the inline SVG favicon,
+# blob: for hls.js media, and image.tmdb.org for the request rail's posters
+# (discover.py hands the browser TMDB poster URLs directly). media-src and
+# connect-src allow the Jellyfin public origin because the <video> element
+# streams directly from it (see playback.py's "token-in-URL" note). frame-ancestors 'none' is the real
 # clickjacking control; X-Frame-Options is the legacy fallback for it.
 _JF_PUBLIC = os.environ.get("JELLYFIN_PUBLIC_URL", "").strip().rstrip("/")
 _CSP = (
     "default-src 'self'; "
     "script-src 'self' 'unsafe-inline'; "
     "style-src 'self' 'unsafe-inline'; "
-    "img-src 'self' data: blob:; "
+    "img-src 'self' data: blob: https://image.tmdb.org; "
     f"media-src 'self' blob: {_JF_PUBLIC}".rstrip() + "; "
     f"connect-src 'self' {_JF_PUBLIC}".rstrip() + "; "
     "font-src 'self'; "
