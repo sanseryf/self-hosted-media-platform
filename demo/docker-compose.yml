@@ -1,0 +1,63 @@
+# Hub demo: the real Hub image against mock upstreams and fictional data.
+#
+#   docker compose -f demo/docker-compose.yml up --build
+#   open http://localhost:8080   (sign in: demo / demo)
+#
+# Nothing here reaches the internet or a real media server. The mocks answer on
+# the same ports and paths as Jellyfin, Sonarr, Radarr, Jellyseerr, a book
+# request service and Kavita, so Hub runs with zero code changes.
+name: hub-demo
+
+x-hub-db: &hub-db postgresql://hub:hub@postgres:5432/hub
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: hub
+      POSTGRES_PASSWORD: hub
+      POSTGRES_DB: hub
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hub"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  upstreams:
+    build: { context: .., dockerfile: demo/Dockerfile }
+    command: ["python", "upstreams/mock_upstreams.py"]
+
+  hub:
+    build: ../hub
+    depends_on:
+      postgres: { condition: service_healthy }
+      upstreams: { condition: service_started }
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: *hub-db
+      JELLYFIN_URL: http://upstreams:8096
+      JELLYFIN_API_KEY: demo
+      SONARR_URL: http://upstreams:8989
+      SONARR_API_KEY: demo
+      RADARR_URL: http://upstreams:7878
+      RADARR_API_KEY: demo
+      JELLYSEERR_URL: http://upstreams:5055
+      JELLYSEERR_API_KEY: demo
+      BOOK_REQUEST_URL: http://upstreams:8088
+      STATUS_HOST: upstreams
+      EVENTS_TOKEN: demo-token
+      HUB_JELLYFIN_LOGIN_ENABLED: "true"
+      HUB_COOKIE_SECURE: "false"      # plain http on localhost
+      MEDIA_BASE: /tmp
+
+  seed:
+    build: { context: .., dockerfile: demo/Dockerfile }
+    command: ["python", "seed/seed.py"]
+    depends_on:
+      hub: { condition: service_started }
+    environment:
+      HUB_URL: http://hub:8080
+      DATABASE_URL: *hub-db
+      EVENTS_TOKEN: demo-token
+    restart: "no"

@@ -97,3 +97,30 @@ jobs:
           echo "files defining the palette: $count"
           grep -l -- '--magenta:#' hub/backend/static/*.css hub/backend/static/*.html 2>/dev/null || true
           [ "$count" -eq 1 ] || { echo "::error::design tokens defined in more than one file"; exit 1; }
+
+  demo:
+    name: Demo stack smoke test
+    runs-on: ubuntu-latest
+    # Builds the real Hub image, runs it against the mock upstreams, seeds it
+    # through the public webhook API, then asserts every screen has data. If a
+    # change breaks the demo, the build says so before a reviewer finds out.
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and start the demo
+        run: docker compose -f demo/docker-compose.yml up --build -d
+
+      - name: Wait for the seeder to finish
+        # `wait` returns the seed container's own exit code.
+        run: timeout 300 docker compose -f demo/docker-compose.yml wait seed
+
+      - name: Smoke test
+        run: python3 demo/smoke_test.py http://localhost:8080
+
+      - name: Container logs
+        if: failure()
+        run: docker compose -f demo/docker-compose.yml logs --no-color
+
+      - name: Tear down
+        if: always()
+        run: docker compose -f demo/docker-compose.yml down -v
