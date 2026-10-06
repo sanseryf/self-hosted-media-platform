@@ -125,11 +125,7 @@ async def process_pending(limit: int = 100) -> dict:
 
                 try:
                     await conn.execute(
-                        """INSERT INTO policy_decisions
-                               (event_id, request_id, requested_by, media_type, tmdb_id, title,
-                                action, reasons, enforced, enforce_result)
-                           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-                           ON CONFLICT (event_id) DO NOTHING""",
+                        INSERT_DECISION_SQL,
                         ev["id"], request_id, ev["user_name"], ev["media_type"], ev["tmdb_id"],
                         ev["title"], decision.action, "; ".join(decision.reasons),
                         enforced, enforce_result)
@@ -138,6 +134,18 @@ async def process_pending(limit: int = 100) -> dict:
     except Exception as e:  # noqa: BLE001
         return {"ok": False, "error": str(e), **counts}
     return {"ok": True, "enforce": POLICY_ENFORCE, **counts}
+
+
+# The unique index on event_id is PARTIAL (WHERE event_id IS NOT NULL), and
+# Postgres only infers a partial index as the arbiter when ON CONFLICT repeats
+# its predicate. Without the WHERE clause every insert raised "no unique or
+# exclusion constraint matching the ON CONFLICT specification", so no decision
+# was ever stored and the same request was re-evaluated on every run.
+INSERT_DECISION_SQL = """INSERT INTO policy_decisions
+       (event_id, request_id, requested_by, media_type, tmdb_id, title,
+        action, reasons, enforced, enforce_result)
+   VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+   ON CONFLICT (event_id) WHERE event_id IS NOT NULL DO NOTHING"""
 
 
 async def _fetch(sql, *args):
