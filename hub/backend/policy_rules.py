@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 class Rules:
     max_pending_per_user: int = 10        # too many outstanding requests → hold
     min_disk_free_gb: float = 50.0        # under this headroom → hold
-    auto_approve_media_types: tuple = ("movie", "tv")  # types eligible for auto-approve at all
+    auto_approve_media_types: tuple = ("movie", "series")  # types eligible for auto-approve at all
     deny_media_types: tuple = ()          # types to refuse outright
     allow_4k: bool = False                # 4k requests always go to manual unless allowed
 
@@ -28,22 +28,33 @@ class PolicyDecision:
     reasons: list = field(default_factory=list)
 
 
+# Events arrive with media_type already normalized ("tv" -> "series", see
+# event_sources._media_type), but rule config is written by hand and may use
+# either word. Canonicalize both sides so "tv" and "series" mean the same thing.
+_ALIASES = {"tv": "series", "show": "series", "film": "movie"}
+
+
+def _canon(mt) -> str:
+    mt = (mt or "").lower()
+    return _ALIASES.get(mt, mt)
+
+
 def evaluate(ctx: dict, rules: Rules) -> PolicyDecision:
     """ctx keys (all optional; missing → that gate is skipped, noted in reasons):
-        media_type: 'movie'|'tv'
+        media_type: 'movie'|'series' (aliases like 'tv' accepted)
         is_4k: bool
         pending_count: int      (requester's current outstanding requests)
         disk_free_gb: float     (headroom on the target *arr root)
     """
     reasons: list[str] = []
-    mt = (ctx.get("media_type") or "").lower()
+    mt = _canon(ctx.get("media_type"))
 
     # Hard deny first.
-    if mt and mt in rules.deny_media_types:
+    if mt and mt in {_canon(t) for t in rules.deny_media_types}:
         return PolicyDecision("deny", [f"media_type '{mt}' is denied by policy"])
 
     # Gates that route to manual (a human decides) rather than deny.
-    if mt and mt not in rules.auto_approve_media_types:
+    if mt and mt not in {_canon(t) for t in rules.auto_approve_media_types}:
         reasons.append(f"media_type '{mt}' not in auto-approve list")
 
     if ctx.get("is_4k") and not rules.allow_4k:

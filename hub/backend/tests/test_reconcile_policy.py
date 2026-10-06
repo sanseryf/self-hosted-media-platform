@@ -76,6 +76,14 @@ def test_policy_denies_configured_type():
     r = P.Rules(deny_media_types=("tv",))
     d = P.evaluate({"media_type": "tv"}, r)
     check("denied media type -> deny with reason", d.action == "deny" and bool(d.reasons))
+    # config says "tv", the event says "series" (normalized at ingest): same type
+    check("deny 'tv' also denies a normalized 'series' event",
+          P.evaluate({"media_type": "series"}, r).action == "deny")
+
+
+def test_policy_auto_approves_series_by_default():
+    d = P.evaluate({"media_type": "series", "pending_count": 0, "disk_free_gb": 800}, P.Rules())
+    check("series clears the default type gate", d.action == "approve")
 
 
 def test_policy_missing_context_skips_gate():

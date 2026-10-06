@@ -91,6 +91,16 @@ def test_jellyseerr_request():
     _check(e.user_name == "alice" and e.title == "Hollow Creek (2025)", "seerr user/title")
 
 
+def test_media_type_is_one_vocabulary():
+    # Jellyseerr labels TV "tv"; Sonarr and Jellyfin say "series". Lifecycle
+    # stitching requires equal media_type, so all three must normalize the same.
+    seerr_tv = dict(JELLYSEERR_APPROVED, media={"media_type": "tv", "tmdbId": 9001, "tvdbId": 368211})
+    _check(es.extract("jellyseerr", seerr_tv).media_type == "series", "seerr tv -> series")
+    _check(es.extract("sonarr", SONARR_GRAB).media_type == "series", "sonarr series")
+    jf_series = dict(JELLYFIN_PLAYBACK, ItemType="Series")
+    _check(es.extract("jellyfin", jf_series).media_type == "series", "jellyfin Series -> series")
+
+
 def test_dedup_is_deterministic():
     a = es.extract("radarr", RADARR_IMPORT).dedup_key
     b = es.extract("radarr", RADARR_IMPORT).dedup_key

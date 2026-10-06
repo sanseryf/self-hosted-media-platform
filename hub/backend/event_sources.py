@@ -51,6 +51,21 @@ def _s(v) -> str | None:
     return s or None
 
 
+# One vocabulary for media_type across sources. Jellyseerr says "tv", Sonarr and
+# Jellyfin say "series"; lifecycle._find_current() only stitches rows whose
+# media_type matches, so without this a TV request split into two titles — the
+# Jellyseerr "requested" row and the Sonarr/Jellyfin row that actually progressed.
+_MEDIA_TYPE_ALIASES = {"tv": "series", "show": "series", "film": "movie"}
+
+
+def _media_type(v) -> str | None:
+    s = _s(v)
+    if s is None:
+        return None
+    s = s.lower()
+    return _MEDIA_TYPE_ALIASES.get(s, s)
+
+
 def _key(*parts) -> str:
     """Deterministic idempotency key from the canonical event tuple. Positions
     are fixed (a missing part becomes "") so the same logical event always hashes
@@ -104,7 +119,7 @@ def _extract_jellyfin(p: dict) -> Envelope:
         source="jellyfin", event_type=str(et), dedup_key=dedup,
         imdb_id=imdb, tmdb_id=tmdb, tvdb_id=tvdb,
         title=_s(p.get("SeriesName") or p.get("Name")),
-        media_type=(item_type.lower() if item_type else None),
+        media_type=_media_type(item_type),
         user_name=user, occurred_at=occurred,
     )
 
@@ -152,7 +167,7 @@ def _extract_jellyseerr(p: dict) -> Envelope:
         source="jellyseerr", event_type=str(et), dedup_key=dedup,
         imdb_id=None, tmdb_id=tmdb, tvdb_id=tvdb,
         title=_s(p.get("subject")),
-        media_type=_s(media.get("media_type")),
+        media_type=_media_type(media.get("media_type")),
         user_name=user, occurred_at=None,
     )
 
